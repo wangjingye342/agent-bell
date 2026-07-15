@@ -1,0 +1,49 @@
+// st77xx_constants.h — color and init-option constants for ST77xx panels.
+//
+// These mirror the macros Adafruit_ST7735/ST7789 expose so sketches that use
+// ST77XX_BLACK, ST7735_GREEN, INITR_BLACKTAB, etc. compile unchanged.
+#pragma once
+
+// initR() tab options (panel variants). Recorded but otherwise inert in sim.
+#define INITR_GREENTAB 0x00
+#define INITR_REDTAB 0x01
+#define INITR_BLACKTAB 0x02
+#define INITR_18GREENTAB INITR_GREENTAB
+#define INITR_18REDTAB INITR_REDTAB
+#define INITR_18BLACKTAB INITR_BLACKTAB
+#define INITR_144GREENTAB 0x01
+#define INITR_MINI160x80 0x04
+#define INITR_HALLOWING 0x05
+#define INITB 0xFF
+
+// Common 16-bit 5-6-5 colors (ST77XX_* canonical names).
+#define ST77XX_BLACK 0x0000
+#define ST77XX_WHITE 0xFFFF
+#define ST77XX_RED 0xF800
+#define ST77XX_GREEN 0x07E0
+#define ST77XX_BLUE 0x001F
+#define ST77XX_CYAN 0x07FF
+#define ST77XX_MAGENTA 0xF81F
+#define ST77XX_YELLOW 0xFFE0
+#define ST77XX_ORANGE 0xFC00
+
+// Legacy ST7735_* / ST7789_* aliases.
+#define ST7735_BLACK ST77XX_BLACK
+#define ST7735_WHITE ST77XX_WHITE
+#define ST7735_RED ST77XX_RED
+#define ST7735_GREEN ST77XX_GREEN
+#define ST7735_BLUE ST77XX_BLUE
+#define ST7735_CYAN ST77XX_CYAN
+#define ST7735_MAGENTA ST77XX_MAGENTA
+#define ST7735_YELLOW ST77XX_YELLOW
+#define ST7735_ORANGE ST77XX_ORANGE
+
+#define ST7789_BLACK ST77XX_BLACK
+#define ST7789_WHITE ST77XX_WHITE
+#define ST7789_RED ST77XX_RED
+#define ST7789_GREEN ST77XX_GREEN
+#define ST7789_BLUE ST77XX_BLUE
+#define ST7789_CYAN ST77XX_CYAN
+#define ST7789_MAGENTA ST77XX_MAGENTA
+#define ST7789_YELLOW ST77XX_YELLOW
+#define ST7789_ORANGE ST77XX_ORANGE

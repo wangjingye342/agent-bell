@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:\\开发板玩法\\agent-bell\\tools\\agent-bell\\claude_stop_hook.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

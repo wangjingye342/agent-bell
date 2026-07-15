@@ -1,0 +1,4 @@
+# Smoke test for the TFT_eSPI facade: draw once, snapshot.
+title TFT_eSPI facade smoke test
+run 50ms
+snap tft_espi

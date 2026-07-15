@@ -1,0 +1,26 @@
+# default.scn — capture all three pages of the demo sketch.
+#
+# The demo (sketch_jun18a) starts on page 0 (climate), and a short touch on
+# GPIO 1 advances to the next page. DHT + clock values below are arbitrary but
+# realistic; edit them to preview other UI states.
+
+title Demo: climate / clock / info
+
+touchpin 1          # demo uses GPIO 1 for the touch button
+temp 26.5           # DHT11 temperature (C)
+hum 60              # DHT11 humidity (%)
+time 14:30:00       # wall clock (HH:MM:SS); date defaults to 2026-01-01
+
+# --- Page 0: climate (gradient arc + center temp/humidity) ---
+run 2200ms          # let the 2s DHT read fire and the arc draw to target
+snap climate
+
+# --- Page 1: clock (big HH:MM) ---
+tap                 # short press -> next page
+run 1200ms          # let the clock page paint
+snap clock
+
+# --- Page 2: info (Temp/Hum labels + values) ---
+tap
+run 1200ms
+snap info

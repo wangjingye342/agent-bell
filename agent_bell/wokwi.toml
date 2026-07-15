@@ -1,0 +1,16 @@
+# AgentBell 的 Wokwi 仿真配置（仅供在电脑上预览 OLED 界面）
+#
+# 用法：VSCode 里打开本文件（agent_bell/wokwi.toml），F1 → "Wokwi: Start Simulator"。
+# 路径相对本文件所在目录（agent_bell/）。
+#
+# 注意：这里指向的是 **SIM_DEMO 版**固件（开机自注入示例通知、跳过联网），
+#   所以一开机就能看到通知界面 + 蜂鸣。编译命令：
+#     arduino-cli compile --fqbn esp32:esp32:esp32c3:PartitionScheme=huge_app \
+#         --build-property "compiler.cpp.extra_flags=-DSIM_DEMO" \
+#         --output-dir agent_bell/build-sim agent_bell
+# Wokwi 联网受限，收不到真实局域网 POST，故 UI 预览走 SIM_DEMO；真机才跑正式固件。
+
+[wokwi]
+version = 1
+firmware = 'build-sim/agent_bell.ino.merged.bin'
+elf = 'build-sim/agent_bell.ino.elf'

@@ -1,0 +1,17 @@
+# arduino-cli 编译产物（本地重生成）
+agent_bell/build/
+agent_bell/build-sim/
+
+# Python 字节码
+__pycache__/
+
+# ino-sim 主机编译产物 / 渲染输出（本地重生成）
+tools/ino-sim/build/
+tools/ino-sim/out/
+tools/ino-sim/out_wx/
+
+# WiFi 凭据（绝不提交）
+agent_bell/secrets.h
+
+# 杂项
+.DS_Store

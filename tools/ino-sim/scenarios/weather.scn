@@ -1,0 +1,51 @@
+# weather.scn — Aurora Night 气象站多场景预览
+title Aurora Night — Weather Station
+
+touchpin 1
+# 室内传感器（DHT）
+temp 24.6
+hum 52
+# 室外天气（mock 注入，真机走 OpenWeatherMap）
+var city Beijing
+var cond Clear
+var out_temp 28
+var feels 30
+var hi 31
+var lo 22
+var out_hum 38
+
+# —— HOME 页：白天晴天 14:30 ——
+time 14:30:20
+run 300ms
+snap home_day
+
+# —— HOME 页：黄昏多云 18:45 ——
+time 18:45:10
+var cond Clouds
+var out_temp 21
+run 300ms
+snap home_dusk
+
+# —— HOME 页：深夜雨 23:50 ——
+time 23:50:30
+var cond Rain
+var out_temp 16
+var feels 15
+run 300ms
+snap home_night
+
+# —— INDOOR 页 ——
+tap
+run 300ms
+snap indoor
+
+# —— WEATHER 页（雨）——
+tap
+run 300ms
+snap weather_rain
+
+# —— WEATHER 页（雷暴，换数据后回到该页）——
+var cond Thunderstorm
+var out_temp 19
+run 300ms
+snap weather_storm

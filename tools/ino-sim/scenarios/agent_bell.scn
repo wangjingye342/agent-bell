@@ -1,0 +1,49 @@
+# AgentBell OLED 界面预览（ino-sim + U8g2 单色后端）
+# 跑法（项目根目录下）：
+#   python tools/ino-sim/simulate.py agent_bell/agent_bell.ino \
+#       --scenario tools/ino-sim/scenarios/agent_bell.scn --out tools/ino-sim/out_ab
+# 变量见 agent_bell.ino 里 simRefresh() 的注释。
+title AgentBell OLED 预览
+
+# 1) 待机屏（SIM 下显示「SIM 预览」+ 地址 + 历史条数）
+var history 3
+run 200ms
+snap 01_idle
+
+# 2) Claude 通知（中文对话名）
+var agent Claude
+var computer 书房台式
+var conversation 仿真器
+var unread 1
+run 200ms
+snap 02_claude
+
+# 3) Codex 通知 + 消息摘要
+var agent Codex
+var computer MacBook
+var conversation 后端重构
+var message 重构完成并通过测试
+var unread 2
+run 200ms
+snap 03_codex
+
+# 4) 待机 + 勿扰（底部状态显示 · 勿扰）
+var agent
+var message
+var dnd 1
+run 200ms
+snap 04_idle_dnd
+
+# 5) 待机 + 关铃（· 关铃）
+var dnd 0
+var buzzer 0
+run 200ms
+snap 05_idle_mute
+
+# 6) 长对话名（测试超宽裁切）
+var agent Claude
+var computer 公司工作站
+var conversation 这是一个特别长的项目名称用来测试屏幕裁切
+var buzzer 1
+run 200ms
+snap 06_longname
