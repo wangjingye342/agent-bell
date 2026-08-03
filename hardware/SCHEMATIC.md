@@ -1,4 +1,9 @@
-# AgentBell 单板 原理图（连接表）
+# AgentBell 单板 原理图草案（连接表）
+
+> **未定版、不可直接投板。** 本文件仍保留旧 TP4056 锂电方案作为历史草案。当前正式基线是主板
+> USB-C + BQ24074 power-path + 后级系统电源、SuperMini 平贴手焊、其余器件由嘉立创贴装；应按
+> [SUPERMINI_CARRIER_SPEC.md](SUPERMINI_CARRIER_SPEC.md) 和 [PCBA_STRATEGY.md](PCBA_STRATEGY.md)
+> 以及 [POWER_PATH.md](POWER_PATH.md) 重画正式原理图，不要逐项照抄本文件。
 
 电源网络：`VBUS`(USB-C 5V，仅充电) · `VBAT`(锂电正) · `3V3`(主电源轨) · `GND`。
 按下面逐块在立创EDA连线即可。元件编号见 [BOM.csv](BOM.csv)。
@@ -47,7 +52,9 @@ USB-C(16P) 座：VBUS/GND 取电；CC1/CC2 各 5.1kΩ 下拉到 GND（识别为�
 
 天线端短边悬出板边，正下方 keepout（无铜、无地）。
 
-## 4. 蜂鸣器（无源 MLT-8530 + SS8550 PNP，低电平触发＝配现固件）
+## 4. 蜂鸣器（历史草案：MLT-8530 + SS8550）
+
+> 小型正式版将改为 MLT-5020 / C94598 及重新核算的驱动电路，本节只保留旧方案参考。
 
 ```
 3V3 ──emitter[SS8550]collector── Buzzer(+) ── Buzzer(−) ── GND
@@ -77,7 +84,9 @@ GPIO10 高 → NPN 导通 → 马达转（固件 VIB_ACTIVE_HIGH=true）。
 
 触摸片：顶层 8–15mm 铜箔，盖阻焊，正下方及四周挖空地铜；表面可覆薄亚克力。
 
-## 7. 旋转编码器（SMD 版 EC11，C209762）
+## 7. 旋转编码器（历史草案：EC11）
+
+> 小型正式版改用 EC05E1220401 / C116648，并增加独立小型确认键；本节不可直接照抄。
 
 | EC11 脚 | 接到 |
 |---|---|

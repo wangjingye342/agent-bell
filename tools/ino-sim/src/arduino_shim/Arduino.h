@@ -122,6 +122,10 @@ int digitalRead(uint8_t pin);
 int analogRead(uint8_t pin);
 void analogWrite(uint8_t pin, int val);
 
+// 中断开关：主机端单线程仿真，无真中断，做成空操作即可
+inline void noInterrupts() {}
+inline void interrupts() {}
+
 long random(long howbig);
 long random(long howsmall, long howbig);
 void randomSeed(unsigned long seed);

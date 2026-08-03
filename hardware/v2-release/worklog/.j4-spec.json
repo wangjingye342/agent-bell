@@ -1,0 +1,5 @@
+{"connections":[
+ {"pin":"J4:1","kind":"net_port_in","net":"GPIO0"},
+ {"pin":"J4:2","kind":"net_port_in","net":"GPIO2"},
+ {"pin":"J4:3","kind":"net_port_in","net":"GPIO21"}
+],"rules":{"avoidTitleBlock":true,"staggerLabels":true,"offsetRange":[30,80],"offsetStep":10,"minLabelGap":14}}

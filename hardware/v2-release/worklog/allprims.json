@@ -1,0 +1,2816 @@
+{
+  "id": "req_562",
+  "type": "response",
+  "version": "v1",
+  "createdAt": "2026-07-27T15:29:37.7452897Z",
+  "ok": true,
+  "result": {
+    "components": [
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1170,
+          "maxY": 825,
+          "minX": 0,
+          "minY": 0
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Drawing-Symbol_A4",
+          "uuid": "f0e483e5e69ef2ad"
+        },
+        "componentType": "sheet",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "f0e483e5e69ef2ad"
+        },
+        "mirror": false,
+        "net": "",
+        "primitiveId": "c743765c560490b9",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 0,
+        "y": 0
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 630.5,
+          "maxY": 460.5,
+          "minX": 539.5,
+          "minY": 369.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "ESP32C3-SuperMini",
+          "uuid": "843475c61170370c"
+        },
+        "componentType": "part",
+        "designator": "U1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "843475c61170370c"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "COMM-SMD_16P-L22.5-W18.0-P2.54-TL",
+          "uuid": "4d55578a8bf88dc6"
+        },
+        "manufacturer": "",
+        "manufacturerId": "ESP32C3-SuperMini",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "c0f5f09bd3117bd2",
+        "rotation": 0,
+        "subPartName": "ESP32C3-SUPERMINI.1",
+        "supplier": "LCSC",
+        "supplierId": "ESP32C3-SUPERMINI.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "ESP32C3-SUPERMINI",
+          "uuid": "345d311ed5bd39a7"
+        },
+        "uniqueId": "gge1",
+        "x": 585,
+        "y": 415
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 595.5,
+          "maxY": 498.5,
+          "minX": 574.5,
+          "minY": 481.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CL21A226MAQNNNE",
+          "uuid": "a885c44b54e79b13"
+        },
+        "componentType": "part",
+        "designator": "C1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "a885c44b54e79b13"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "C0805",
+          "uuid": "03d59477fb62b853"
+        },
+        "manufacturer": "SAMSUNG(三星)",
+        "manufacturerId": "CL21A226MAQNNNE",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Value": "",
+          "Voltage Rating": ""
+        },
+        "primitiveId": "b5b17f01cfcdb427",
+        "rotation": 0,
+        "subPartName": "CL21A226MAQNNNE.1",
+        "supplier": "LCSC",
+        "supplierId": "CL21A226MAQNNNE.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CL21A226MAQNNNE",
+          "uuid": "d91e14d647a6a260"
+        },
+        "uniqueId": "gge2",
+        "x": 585,
+        "y": 490
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 205.5,
+          "maxY": 645.5,
+          "minX": 184.5,
+          "minY": 594.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SIP4",
+          "uuid": "a2e570ce756e20db"
+        },
+        "componentType": "part",
+        "designator": "J1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "a2e570ce756e20db"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HDR-TH_4P-P2.54-V-M-3",
+          "uuid": "cb5238b7bcc95f09"
+        },
+        "manufacturer": "",
+        "manufacturerId": "SIP4",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "9c2811c8bc3b7405",
+        "rotation": 0,
+        "subPartName": "SIP4.1",
+        "supplier": "LCSC",
+        "supplierId": "SIP4.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SIP4",
+          "uuid": "ea546049955eabd5"
+        },
+        "uniqueId": "gge3",
+        "x": 195,
+        "y": 620
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 205.5,
+          "maxY": 683.5,
+          "minX": 184.5,
+          "minY": 666.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CC0603KRX7R9BB104",
+          "uuid": "caa0698c23259299"
+        },
+        "componentType": "part",
+        "designator": "C2",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "caa0698c23259299"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "C0603",
+          "uuid": "d61ac55f0047da24"
+        },
+        "manufacturer": "YAGEO(国巨)",
+        "manufacturerId": "CC0603KRX7R9BB104",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Value": "",
+          "Voltage Rating": ""
+        },
+        "primitiveId": "f82a4e99eb0ae213",
+        "rotation": 0,
+        "subPartName": "CC0603KRX7R9BB104.1",
+        "supplier": "LCSC",
+        "supplierId": "CC0603KRX7R9BB104.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CC0603KRX7R9BB104",
+          "uuid": "9780bccfafb0bfa6"
+        },
+        "uniqueId": "gge4",
+        "x": 195,
+        "y": 675
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 205.5,
+          "maxY": 225.5,
+          "minX": 184.5,
+          "minY": 184.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HEAD3",
+          "uuid": "dacca2c341e515fc"
+        },
+        "componentType": "part",
+        "designator": "J2",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "dacca2c341e515fc"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HDR-TH_3P-P2.54-V-M-2",
+          "uuid": "98cd78b690958c6f"
+        },
+        "manufacturer": "",
+        "manufacturerId": "HEAD3",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "a66d1a02d435b040",
+        "rotation": 0,
+        "subPartName": "HEAD3.1",
+        "supplier": "LCSC",
+        "supplierId": "HEAD3.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HEAD3",
+          "uuid": "4c474acc791c9cf6"
+        },
+        "uniqueId": "gge5",
+        "x": 195,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 205.5,
+          "maxY": 330.5,
+          "minX": 184.5,
+          "minY": 259.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "长排针,2.54mm,6p",
+          "uuid": "bdd9fed3f73f8932"
+        },
+        "componentType": "part",
+        "designator": "J4",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "bdd9fed3f73f8932"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HDR-TH_6P-P2.54-V-M-A",
+          "uuid": "6212c79801e638bf"
+        },
+        "manufacturer": "",
+        "manufacturerId": "长排针,2.54mm,6p",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "81871657ecbc4372",
+        "rotation": 0,
+        "subPartName": "长排针,2.54MM,6P.1",
+        "supplier": "LCSC",
+        "supplierId": "长排针,2.54MM,6P.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "长排针,2.54MM,6P",
+          "uuid": "c9e40ddd9ce6b6a1"
+        },
+        "uniqueId": "gge6",
+        "x": 195,
+        "y": 295
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 995.5,
+          "maxY": 640.5,
+          "minX": 954.5,
+          "minY": 599.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "EC11B152442D-STEC11B03",
+          "uuid": "074d18bc802820ba"
+        },
+        "componentType": "part",
+        "designator": "SW1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "074d18bc802820ba"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SW-TH_EC11B152442D-STEC11B03",
+          "uuid": "58b58fd17c251547"
+        },
+        "manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+        "manufacturerId": "EC11B152442D-STEC11B03",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "de3560427cb73df7",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "supplier": "LCSC",
+        "supplierId": "pid8a0e77bacb214e",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "EC11B152442D-STEC11B03",
+          "uuid": "eb41160c881a329c"
+        },
+        "uniqueId": "gge7",
+        "x": 975,
+        "y": 620
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1035.5,
+          "maxY": 674.5,
+          "minX": 1014.5,
+          "minY": 665.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "componentType": "part",
+        "designator": "R1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1002T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "5cc0ebb9e62088de",
+        "rotation": 0,
+        "subPartName": "0603WAF1002T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1002T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "3de4afd8b0fb59a0"
+        },
+        "uniqueId": "gge8",
+        "x": 1025,
+        "y": 670
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 935.5,
+          "maxY": 674.5,
+          "minX": 914.5,
+          "minY": 665.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "componentType": "part",
+        "designator": "R2",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1002T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "9bb6e7302a27fee9",
+        "rotation": 0,
+        "subPartName": "0603WAF1002T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1002T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "3de4afd8b0fb59a0"
+        },
+        "uniqueId": "gge9",
+        "x": 925,
+        "y": 670
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1035.5,
+          "maxY": 574.5,
+          "minX": 1014.5,
+          "minY": 565.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "componentType": "part",
+        "designator": "R3",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1002T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "c37927dc5d4a0b2f",
+        "rotation": 0,
+        "subPartName": "0603WAF1002T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1002T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "3de4afd8b0fb59a0"
+        },
+        "uniqueId": "gge10",
+        "x": 1025,
+        "y": 570
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 984.5,
+          "maxY": 430.5,
+          "minX": 964.5,
+          "minY": 399.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "MLT-8530_C94599",
+          "uuid": "3f7e4fde6cd07771"
+        },
+        "componentType": "part",
+        "designator": "LS1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "3f7e4fde6cd07771"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "BUZ-SMD_4P-L8.5-W8.5-P8.50-BR",
+          "uuid": "04fd51ee07228b38"
+        },
+        "manufacturer": "华能",
+        "manufacturerId": "MLT-8530",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Continuous Operating Time": "",
+          "Current Consumption": "",
+          "Datasheet": "",
+          "Description": "",
+          "Diameter(φD)": "",
+          "Driver Circuitry": "",
+          "Height": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Lead Pitch": "",
+          "Length": "",
+          "Mounting Type": "",
+          "Operating Temperature": "",
+          "Sound Pressure Level(SPL)": "",
+          "Supplier Footprint": "",
+          "Technology": "",
+          "Value": "",
+          "Voltage - Supply": "",
+          "Voltage Rating": "",
+          "Width": ""
+        },
+        "primitiveId": "615433803faaebcd",
+        "rotation": 0,
+        "subPartName": "MLT-8530.1",
+        "supplier": "LCSC",
+        "supplierId": "MLT-8530.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "MLT-8530",
+          "uuid": "604760a69fdb28d2"
+        },
+        "uniqueId": "gge11",
+        "x": 970,
+        "y": 415
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 980.5,
+          "maxY": 470.5,
+          "minX": 969.5,
+          "minY": 449.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SS8550 Y2(RANGE:200-350)",
+          "uuid": "84757e27d1c648b4"
+        },
+        "componentType": "part",
+        "designator": "Q1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "84757e27d1c648b4"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
+          "uuid": "46b2d162e5e53bdd"
+        },
+        "manufacturer": "CJ(江苏长电/长晶)",
+        "manufacturerId": "SS8550 Y2(RANGE:200-350)",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Collector Current (Ic)": "",
+          "Collector Cut-Off Current (Icbo)": "",
+          "Collector-Emitter Breakdown Voltage (Vceo)": "",
+          "Collector-Emitter Saturation Voltage (VCE(sat)@Ic,Ib)": "",
+          "DC Current Gain (hFE@Ic,Vce)": "",
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power Dissipation (Pd)": "",
+          "Supplier Footprint": "",
+          "Transistor Type": "",
+          "Transition Frequency (fT)": ""
+        },
+        "primitiveId": "e96fdf2d9153f0a5",
+        "rotation": 0,
+        "subPartName": "SS8550_C8542.1",
+        "supplier": "LCSC",
+        "supplierId": "SS8550_C8542.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SS8550_C8542",
+          "uuid": "0a0d83bdd94c57e6"
+        },
+        "uniqueId": "gge12",
+        "x": 980,
+        "y": 460
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 920.5,
+          "maxY": 464.5,
+          "minX": 899.5,
+          "minY": 455.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1001T5E",
+          "uuid": "b77382197dabd74f"
+        },
+        "componentType": "part",
+        "designator": "R4",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "b77382197dabd74f"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1001T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "ff79af77aa7f14a5",
+        "rotation": 0,
+        "subPartName": "0603WAF1001T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1001T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1001T5E",
+          "uuid": "f9901f5f68026fb9"
+        },
+        "uniqueId": "gge13",
+        "x": 910,
+        "y": 460
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 900.5,
+          "maxY": 514.5,
+          "minX": 879.5,
+          "minY": 505.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "componentType": "part",
+        "designator": "R5",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1002T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "587e7f8d5848dcfe",
+        "rotation": 0,
+        "subPartName": "0603WAF1002T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1002T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "3de4afd8b0fb59a0"
+        },
+        "uniqueId": "gge14",
+        "x": 890,
+        "y": 510
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 770.5,
+          "maxY": 285.5,
+          "minX": 749.5,
+          "minY": 254.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HEAD2",
+          "uuid": "6143180661a3e0e2"
+        },
+        "componentType": "part",
+        "designator": "J3",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "6143180661a3e0e2"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HDR-TH_2P-P2.54-V-M",
+          "uuid": "e9bc31a8bac5a014"
+        },
+        "manufacturer": "",
+        "manufacturerId": "HEAD2",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": ""
+        },
+        "primitiveId": "8f82c430439b35cc",
+        "rotation": 0,
+        "subPartName": "HEAD2.1",
+        "supplier": "LCSC",
+        "supplierId": "HEAD2.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "HEAD2",
+          "uuid": "c1cde00f1f37f19f"
+        },
+        "uniqueId": "gge15",
+        "x": 760,
+        "y": 270
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 604.5,
+          "maxY": 215.5,
+          "minX": 569.5,
+          "minY": 194.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "AO3400A_C20917",
+          "uuid": "017c12df7deda328"
+        },
+        "componentType": "part",
+        "designator": "Q2",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "017c12df7deda328"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR",
+          "uuid": "46b2d162e5e53bdd"
+        },
+        "manufacturer": "AOS",
+        "manufacturerId": "AO3400A",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Configuration": "",
+          "Current - Continuous Drain(Id)": "",
+          "Datasheet": "",
+          "Description": "",
+          "Drain to Source Voltage": "",
+          "Gate Charge(Qg)": "",
+          "Gate Threshold Voltage (Vgs(th))": "",
+          "Input Capacitance(Ciss)": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Number": "",
+          "Operating Temperature": "",
+          "Output Capacitance(Coss)": "",
+          "Pd - Power Dissipation": "",
+          "RDS(on)": "",
+          "Reverse Transfer Capacitance (Crss@Vds)": "",
+          "Supplier Footprint": "",
+          "Type": ""
+        },
+        "primitiveId": "b38284c82c583073",
+        "rotation": 0,
+        "subPartName": "AO3400A.1",
+        "supplier": "LCSC",
+        "supplierId": "AO3400A.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "AO3400A",
+          "uuid": "6a46c86b7fbd4a2a"
+        },
+        "uniqueId": "gge16",
+        "x": 580,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 490.5,
+          "maxY": 209.5,
+          "minX": 469.5,
+          "minY": 200.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1000T5E",
+          "uuid": "010f702c9a280654"
+        },
+        "componentType": "part",
+        "designator": "R6",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "010f702c9a280654"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1000T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature Range": "",
+          "Overload Voltage (Max)": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": ""
+        },
+        "primitiveId": "c90fab8d17bc7ca3",
+        "rotation": 0,
+        "subPartName": "0603WAF1000T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1000T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1000T5E",
+          "uuid": "6047e7c95e4ca421"
+        },
+        "uniqueId": "gge17",
+        "x": 480,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 540.5,
+          "maxY": 154.5,
+          "minX": 519.5,
+          "minY": 145.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "componentType": "part",
+        "designator": "R7",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "f88f58cde5ffe2de"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "R0603",
+          "uuid": "94b95473605319c7"
+        },
+        "manufacturer": "UNI-ROYAL(厚声)",
+        "manufacturerId": "0603WAF1002T5E",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Temperature": "",
+          "Power(Watts)": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Type": "",
+          "Value": "",
+          "Voltage-Supply(Max)": ""
+        },
+        "primitiveId": "33b67a4ea1f83c67",
+        "rotation": 0,
+        "subPartName": "0603WAF1002T5E.1",
+        "supplier": "LCSC",
+        "supplierId": "0603WAF1002T5E.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "0603WAF1002T5E",
+          "uuid": "3de4afd8b0fb59a0"
+        },
+        "uniqueId": "gge18",
+        "x": 530,
+        "y": 150
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 645.5,
+          "maxY": 283.5,
+          "minX": 632.5,
+          "minY": 266.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SS34_C8678",
+          "uuid": "4f7cf2ef7ee04933"
+        },
+        "componentType": "part",
+        "designator": "D1",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Manufacturer Part}",
+          "uuid": "4f7cf2ef7ee04933"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SMA_L4.3-W2.6-LS5.2-RD",
+          "uuid": "1b9b69795f0d55cc"
+        },
+        "manufacturer": "MDD(辰达半导体)",
+        "manufacturerId": "SS34",
+        "mirror": false,
+        "name": "={Manufacturer Part}",
+        "net": "",
+        "otherProperty": {
+          "Current - Rectified": "",
+          "Datasheet": "",
+          "Description": "",
+          "Diode Configuration": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Operating Junction Temperature Range": "",
+          "Reverse Leakage Current (Ir)": "",
+          "Supplier Footprint": "",
+          "Voltage - DC Reverse(Vr)": "",
+          "Voltage - Forward(Vf@If)": ""
+        },
+        "primitiveId": "123ac60b32bbf06f",
+        "rotation": 0,
+        "subPartName": "SS34_C8678.1",
+        "supplier": "LCSC",
+        "supplierId": "SS34_C8678.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "SS34_C8678",
+          "uuid": "d19b2efd447200ad"
+        },
+        "uniqueId": "gge19",
+        "x": 640,
+        "y": 275
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 720.5,
+          "maxY": 283.5,
+          "minX": 699.5,
+          "minY": 266.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CC0603KRX7R9BB104",
+          "uuid": "caa0698c23259299"
+        },
+        "componentType": "part",
+        "designator": "C4",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "caa0698c23259299"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "C0603",
+          "uuid": "d61ac55f0047da24"
+        },
+        "manufacturer": "YAGEO(国巨)",
+        "manufacturerId": "CC0603KRX7R9BB104",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Value": "",
+          "Voltage Rating": ""
+        },
+        "primitiveId": "b63553b37dc252d4",
+        "rotation": 0,
+        "subPartName": "CC0603KRX7R9BB104.1",
+        "supplier": "LCSC",
+        "supplierId": "CC0603KRX7R9BB104.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "CC0603KRX7R9BB104",
+          "uuid": "9780bccfafb0bfa6"
+        },
+        "uniqueId": "gge20",
+        "x": 710,
+        "y": 275
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 645.5,
+          "maxY": 213.5,
+          "minX": 624.5,
+          "minY": 196.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "GRM21BR61H106KE43L",
+          "uuid": "3bdf67fd79d57582"
+        },
+        "componentType": "part",
+        "designator": "C3",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "={Value}",
+          "uuid": "3bdf67fd79d57582"
+        },
+        "footprint": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "C0805",
+          "uuid": "03d59477fb62b853"
+        },
+        "manufacturer": "muRata(村田)",
+        "manufacturerId": "GRM21BR61H106KE43L",
+        "mirror": false,
+        "name": "={Value}",
+        "net": "",
+        "otherProperty": {
+          "Datasheet": "",
+          "Description": "",
+          "JLCPCB Part Class": "",
+          "LCSC Part Name": "",
+          "Supplier Footprint": "",
+          "Temperature Coefficient": "",
+          "Tolerance": "",
+          "Value": "",
+          "Voltage Rating": ""
+        },
+        "primitiveId": "0769f3e268e727f7",
+        "rotation": 0,
+        "subPartName": "GRM21BR61H106KE43L.1",
+        "supplier": "LCSC",
+        "supplierId": "GRM21BR61H106KE43L.1",
+        "symbol": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "GRM21BR61H106KE43L",
+          "uuid": "89f21c00b2723b17"
+        },
+        "uniqueId": "gge21",
+        "x": 635,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 670.5,
+          "maxY": 435.5,
+          "minX": 664.5,
+          "minY": 424.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "53eb763c4623038f",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 660,
+        "y": 430
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 150.5,
+          "maxY": 630.5,
+          "minX": 144.5,
+          "minY": 619.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "0fd15119dc53f40b",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 625
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 150.5,
+          "maxY": 210.5,
+          "minX": 144.5,
+          "minY": 199.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "537729bf69631a29",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 150.5,
+          "maxY": 285.5,
+          "minX": 144.5,
+          "minY": 274.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "726b37aee529ef04",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 280
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1075.5,
+          "maxY": 675.5,
+          "minX": 1069.5,
+          "minY": 664.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "74ce05d6e863ee7b",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1065,
+        "y": 670
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 975.5,
+          "maxY": 675.5,
+          "minX": 969.5,
+          "minY": 664.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "e40b4dab4634a9c6",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 965,
+        "y": 670
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1075.5,
+          "maxY": 575.5,
+          "minX": 1069.5,
+          "minY": 564.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "36fe439e116a41b5",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1065,
+        "y": 570
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 845.5,
+          "maxY": 515.5,
+          "minX": 839.5,
+          "minY": 504.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "d9743be619fbbdd0",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 850,
+        "y": 510
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1010.5,
+          "maxY": 445.5,
+          "minX": 1004.5,
+          "minY": 434.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "10a6d57923e0ea06",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1000,
+        "y": 440
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 745.5,
+          "maxY": 305.5,
+          "minX": 734.5,
+          "minY": 299.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "01444265ae8eb471",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 740,
+        "y": 295
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 595.5,
+          "maxY": 280.5,
+          "minX": 589.5,
+          "minY": 269.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "3ec72a791f6364d3",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 600,
+        "y": 275
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 735.5,
+          "maxY": 320.5,
+          "minX": 724.5,
+          "minY": 314.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "b070c4ee8d3576d9",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 730,
+        "y": 310
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 635.5,
+          "maxY": 495.5,
+          "minX": 629.5,
+          "minY": 484.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "0ae0168a41cbb6db",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 625,
+        "y": 490
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 245.5,
+          "maxY": 680.5,
+          "minX": 239.5,
+          "minY": 669.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "0430a95be22f9eb0",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 235,
+        "y": 675
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 685.5,
+          "maxY": 210.5,
+          "minX": 679.5,
+          "minY": 199.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "3V3",
+        "primitiveId": "2a979bb0e62e7d2f",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 675,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 670.5,
+          "maxY": 455.5,
+          "minX": 664.5,
+          "minY": 444.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "5V",
+        "primitiveId": "cfe99ad24a1c2439",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 660,
+        "y": 450
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 120.5,
+          "maxY": 295.5,
+          "minX": 114.5,
+          "minY": 284.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Power-5V",
+          "uuid": "d77473c0bb606867"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d77473c0bb606867"
+        },
+        "mirror": false,
+        "net": "5V",
+        "primitiveId": "ae91611bfbb2c0fe",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 125,
+        "y": 290
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 709.5,
+          "maxY": 450.5,
+          "minX": 699.5,
+          "minY": 429.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "a4b25972d35367dd",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 690,
+        "y": 440
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 115.5,
+          "maxY": 645.5,
+          "minX": 105.5,
+          "minY": 624.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "b2294ae576564aa1",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 125,
+        "y": 635
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 115.5,
+          "maxY": 205.5,
+          "minX": 105.5,
+          "minY": 184.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "5f274363fe8b4576",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 125,
+        "y": 195
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 185.5,
+          "maxY": 240.5,
+          "minX": 164.5,
+          "minY": 230.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "69edfbc581c78bc8",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 175,
+        "y": 250
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 985.5,
+          "maxY": 560.5,
+          "minX": 964.5,
+          "minY": 550.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "f71a979b88273cef",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 975,
+        "y": 570
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 995.5,
+          "maxY": 704.5,
+          "minX": 974.5,
+          "minY": 694.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "10c3686074ae49af",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 985,
+        "y": 685
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 915.5,
+          "maxY": 630.5,
+          "minX": 905.5,
+          "minY": 609.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "de60364b8bc4ddb6",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 925,
+        "y": 620
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1044.5,
+          "maxY": 630.5,
+          "minX": 1034.5,
+          "minY": 609.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "cf4bdce2b5ca49a5",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1025,
+        "y": 620
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 925.5,
+          "maxY": 420.5,
+          "minX": 915.5,
+          "minY": 399.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "b94b91a3a2e9f470",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 935,
+        "y": 410
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 560.5,
+          "maxY": 195.5,
+          "minX": 550.5,
+          "minY": 174.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "5b3aec105b4fb431",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 570,
+        "y": 185
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 560.5,
+          "maxY": 219.5,
+          "minX": 539.5,
+          "minY": 209.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "cbdffff19a8e1089",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 550,
+        "y": 200
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 535.5,
+          "maxY": 500.5,
+          "minX": 525.5,
+          "minY": 479.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "56c46c77226170fa",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 545,
+        "y": 490
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 145.5,
+          "maxY": 685.5,
+          "minX": 135.5,
+          "minY": 664.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "97feb3a76ce5a74c",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 675
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 625.5,
+          "maxY": 244.5,
+          "minX": 604.5,
+          "minY": 234.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Ground-GND",
+          "uuid": "d27472e16df661f1"
+        },
+        "componentType": "netflag",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "d27472e16df661f1"
+        },
+        "mirror": false,
+        "net": "GND",
+        "primitiveId": "dcbdb9093cb0c47f",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 615,
+        "y": 225
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 500.5,
+          "maxY": 455.5,
+          "minX": 469.5,
+          "minY": 444.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "OLED_SDA",
+        "primitiveId": "ac8540cdb2fcb9f2",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 510,
+        "y": 450
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 145.5,
+          "maxY": 610.5,
+          "minX": 114.5,
+          "minY": 599.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "OLED_SDA",
+        "primitiveId": "4134d1a5e6a8842c",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 605
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 470.5,
+          "maxY": 445.5,
+          "minX": 439.5,
+          "minY": 434.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "OLED_SCL",
+        "primitiveId": "e9e0e9062dd4d892",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 480,
+        "y": 440
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 115.5,
+          "maxY": 620.5,
+          "minX": 84.5,
+          "minY": 609.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "OLED_SCL",
+        "primitiveId": "41d7c625e1771df6",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 125,
+        "y": 615
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 730.5,
+          "maxY": 425.5,
+          "minX": 699.5,
+          "minY": 414.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "TOUCH_SIG",
+        "primitiveId": "e3384b33cd514395",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 690,
+        "y": 420
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 115.5,
+          "maxY": 220.5,
+          "minX": 84.5,
+          "minY": 209.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "TOUCH_SIG",
+        "primitiveId": "bc865107a85ebd34",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 125,
+        "y": 215
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 700.5,
+          "maxY": 395.5,
+          "minX": 669.5,
+          "minY": 384.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_CLK",
+        "primitiveId": "e25675c00ea37a5b",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 660,
+        "y": 390
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 970.5,
+          "maxY": 545.5,
+          "minX": 959.5,
+          "minY": 514.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_CLK",
+        "primitiveId": "0f071ba25774dbac",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 965,
+        "y": 555
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1010.5,
+          "maxY": 640.5,
+          "minX": 999.5,
+          "minY": 609.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_CLK",
+        "primitiveId": "87d3d942b2d58317",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1005,
+        "y": 650
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 500.5,
+          "maxY": 435.5,
+          "minX": 469.5,
+          "minY": 424.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_DT",
+        "primitiveId": "45810926c72f82e6",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 510,
+        "y": 430
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 990.5,
+          "maxY": 530.5,
+          "minX": 979.5,
+          "minY": 499.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_DT",
+        "primitiveId": "3a193dc25d543687",
+        "rotation": 270,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 985,
+        "y": 540
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 875.5,
+          "maxY": 675.5,
+          "minX": 844.5,
+          "minY": 664.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_DT",
+        "primitiveId": "2aa8f7dd4c0701a7",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 885,
+        "y": 670
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 500.5,
+          "maxY": 395.5,
+          "minX": 469.5,
+          "minY": 384.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_SW",
+        "primitiveId": "b421a94909fbefbd",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 510,
+        "y": 390
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 935.5,
+          "maxY": 655.5,
+          "minX": 904.5,
+          "minY": 644.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_SW",
+        "primitiveId": "b7334ae6bd8d5076",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 945,
+        "y": 650
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 1010.5,
+          "maxY": 630.5,
+          "minX": 999.5,
+          "minY": 599.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "ENC_SW",
+        "primitiveId": "9b3704ac31bbe795",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 1005,
+        "y": 590
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 700.5,
+          "maxY": 415.5,
+          "minX": 669.5,
+          "minY": 404.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "BUZZER_CTRL",
+        "primitiveId": "3bf3732f41bea785",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 660,
+        "y": 410
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 860.5,
+          "maxY": 465.5,
+          "minX": 829.5,
+          "minY": 454.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "BUZZER_CTRL",
+        "primitiveId": "3658e69568cc334e",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 870,
+        "y": 460
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 470.5,
+          "maxY": 405.5,
+          "minX": 439.5,
+          "minY": 394.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "VIB_CTRL",
+        "primitiveId": "cb21b3e218a18bab",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 480,
+        "y": 400
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 430.5,
+          "maxY": 210.5,
+          "minX": 399.5,
+          "minY": 199.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "VIB_CTRL",
+        "primitiveId": "1e6a3a46d620a139",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 440,
+        "y": 205
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 730.5,
+          "maxY": 385.5,
+          "minX": 699.5,
+          "minY": 374.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO0",
+        "primitiveId": "8ece04e9d80747f5",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 690,
+        "y": 380
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 180.5,
+          "maxY": 380.5,
+          "minX": 169.5,
+          "minY": 349.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO0",
+        "primitiveId": "21da557d8c537d4b",
+        "rotation": 90,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 175,
+        "y": 340
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 730.5,
+          "maxY": 405.5,
+          "minX": 699.5,
+          "minY": 394.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO2",
+        "primitiveId": "ade121192c8cb7e1",
+        "rotation": 0,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 690,
+        "y": 400
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 145.5,
+          "maxY": 315.5,
+          "minX": 114.5,
+          "minY": 304.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO2",
+        "primitiveId": "bdbf0154aa514e42",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 155,
+        "y": 310
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 470.5,
+          "maxY": 385.5,
+          "minX": 439.5,
+          "minY": 374.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO21",
+        "primitiveId": "931e134b2bfeeee6",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 480,
+        "y": 380
+      },
+      {
+        "addIntoBom": true,
+        "addIntoPcb": true,
+        "bbox": {
+          "maxX": 85.5,
+          "maxY": 305.5,
+          "minX": 54.5,
+          "minY": 294.5
+        },
+        "component": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "Netport-BI",
+          "uuid": "41acb8757cee0c44"
+        },
+        "componentType": "netport",
+        "device": {
+          "libraryUuid": "0819f05c4eef4c71ace90d822a990e87",
+          "name": "",
+          "uuid": "41acb8757cee0c44"
+        },
+        "mirror": false,
+        "net": "GPIO21",
+        "primitiveId": "55834c229ffa1b2c",
+        "rotation": 180,
+        "subPartName": "pid8a0e77bacb214e",
+        "x": 95,
+        "y": 300
+      }
+    ],
+    "count": 78,
+    "wires": []
+  },
+  "context": {
+    "projectUuid": "785711aa7de8bbfb6dd90dcde7d50e500d3836d8852383996add90965a5d0eb0",
+    "projectName": "AgentBell",
+    "documentUuid": "fb3a6ed7683b04aa",
+    "documentType": "schematic",
+    "tabId": "fb3a6ed7683b04aa@785711aa7de8bbfb6dd90dcde7d50e500d3836d8852383996add90965a5d0eb0"
+  }
+}

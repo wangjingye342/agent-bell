@@ -47,3 +47,35 @@ var conversation 这是一个特别长的项目名称用来测试屏幕裁切
 var buzzer 1
 run 200ms
 snap 06_longname
+
+# ===== 待机屏半屏模块（lsty/rsty = 左/右半屏模块索引）=====
+# 0宇航员 1数字时钟 2模拟表盘 3竖排大钟 4日历 5信息面板 6雷达扫描 7流星夜空
+var agent
+var conversation
+var unread 3
+
+# 7) 模拟表盘 + 竖排大钟
+var lsty 2
+var rsty 3
+run 300ms
+snap 07_analog_bigtime
+
+# 8) 日历 + 信息面板
+var lsty 4
+var rsty 5
+run 200ms
+snap 08_calendar_info
+
+# 9) 雷达扫描 + 流星夜空（隔 400ms 两帧，捕捉扫描线/流星动画）
+var lsty 6
+var rsty 7
+run 200ms
+snap 09_radar_meteor_a
+run 400ms
+snap 10_radar_meteor_b
+
+# 10) 左右互换演示：数字时钟在左、宇航员在右（模块两边通用）
+var lsty 1
+var rsty 0
+run 200ms
+snap 11_swapped

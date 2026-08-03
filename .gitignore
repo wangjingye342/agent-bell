@@ -1,6 +1,7 @@
 # arduino-cli 编译产物（本地重生成）
 agent_bell/build/
 agent_bell/build-sim/
+tools/board_selftest/build/
 
 # Python 字节码
 __pycache__/
@@ -9,9 +10,28 @@ __pycache__/
 tools/ino-sim/build/
 tools/ino-sim/out/
 tools/ino-sim/out_wx/
+tools/ino-sim/out_ab/
 
 # WiFi 凭据（绝不提交）
 agent_bell/secrets.h
+
+# EDA 工具会话缓存 / 抓取的元器件数据（本地重生成）
+.codex/
+.easyeda/
+
+# EDA 工程快照备份 / 一次性调试中间产物（本地留档即可）
+hardware/backup/
+hardware/debug/
+hardware/v3-work/_*
+
+# 第三方仓库下载（ESP32-C3 SuperMini 官方资料，按需重新下载）
+hardware/ESP32C3-Supermini-main/
+
+# 桥接程序打包产物（PyInstaller/Inno 本地重生成）与调试截图
+tools/agent-bell-bridge/pack/build/
+tools/agent-bell-bridge/pack/dist/
+tools/agent-bell-bridge/pack/Output/
+tools/agent-bell-bridge/pack/ui_*.png
 
 # 杂项
 .DS_Store

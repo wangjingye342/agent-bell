@@ -1,0 +1,78 @@
+{
+  "id": "req_561",
+  "ok": true,
+  "result": {
+    "passed": false,
+    "summary": {
+      "trees": 4,
+      "bridges": 0,
+      "orphans": 4,
+      "orphanFlags": 0,
+      "wireTreesTotal": 60
+    },
+    "trees": [
+      {
+        "kind": "ORPHAN",
+        "type": "orphan-stub",
+        "level": "warn",
+        "wireIds": [
+          "ddb213649a29b806"
+        ],
+        "flagIds": [],
+        "pins": [
+          "Q2:1",
+          "R6:2",
+          "R7:1"
+        ],
+        "nets": []
+      },
+      {
+        "kind": "ORPHAN",
+        "type": "orphan-stub",
+        "level": "warn",
+        "wireIds": [
+          "cea117f68f1bb6e4"
+        ],
+        "flagIds": [],
+        "pins": [
+          "J3:2",
+          "Q2:3",
+          "D1:2",
+          "C4:1"
+        ],
+        "nets": []
+      },
+      {
+        "kind": "ORPHAN",
+        "type": "orphan-stub",
+        "level": "warn",
+        "wireIds": [
+          "9fc8f7694e9fe660"
+        ],
+        "flagIds": [],
+        "pins": [
+          "Q1:1",
+          "R4:2",
+          "R5:2"
+        ],
+        "nets": []
+      },
+      {
+        "kind": "ORPHAN",
+        "type": "orphan-stub",
+        "level": "warn",
+        "wireIds": [
+          "672868fb434438e4"
+        ],
+        "flagIds": [],
+        "pins": [
+          "LS1:1",
+          "Q1:3"
+        ],
+        "nets": []
+      }
+    ]
+  },
+  "type": "response",
+  "version": "v1"
+}

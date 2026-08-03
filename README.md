@@ -1,4 +1,4 @@
-# AgentBell 智能体门铃
+# AgentBell
 
 独立的桌面小工具项目：电脑上 **Claude Code / Codex** 完成一轮对话时，局域网里的 ESP32-C3 设备
 **蜂鸣 + 震动**，并在 OLED 上显示「哪台电脑 / 哪个智能体 / 哪个对话」完成了。
@@ -21,7 +21,8 @@
 |---|---|
 | `agent_bell/` | **设备固件**（ESP32-C3 + SSD1306 OLED）+ Wokwi 预览。见 [agent_bell/README.md](agent_bell/README.md) |
 | `agent_bell/WIRING.md` | **接线表**（先看这个） |
-| `tools/agent-bell/` | **电脑侧**通知器 + Claude/Codex 适配器。见 [tools/agent-bell/README.md](tools/agent-bell/README.md) |
+| `tools/agent-bell-bridge/` | **推荐：电脑侧桥接程序**（托盘常驻，免 hook 自动转发系统通知 + 自动发现设备 + 远程设置）。见 [tools/agent-bell-bridge/README.md](tools/agent-bell-bridge/README.md) |
+| `tools/agent-bell/` | 电脑侧 hook 方案（Claude/Codex 适配器，备用）。见 [tools/agent-bell/README.md](tools/agent-bell/README.md) |
 | `tools/ino-sim/` | 从气象站项目拷来的**屏幕模拟器**（备用，见下） |
 
 ## 快速开始
@@ -34,7 +35,9 @@
    arduino-cli upload -p COM5 --fqbn esp32:esp32:esp32c3 --input-dir agent_bell/build agent_bell
    ```
 4. 打开 `http://agent-bell.local/` 登录 → 点「发一条测试通知」自测。
-5. 接智能体（Claude 的 Stop hook / Codex 的 notify）：见 [tools/agent-bell/README.md](tools/agent-bell/README.md)。
+5. 接电脑（二选一）：
+   - **推荐**：装桥接程序（免 hook，Claude/Codex 发系统通知即自动转发），见 [tools/agent-bell-bridge/README.md](tools/agent-bell-bridge/README.md)。
+   - 备用：hook 方案（Claude 的 Stop hook / Codex 的 notify），见 [tools/agent-bell/README.md](tools/agent-bell/README.md)。
 
 ## 关于 ino-sim 模拟器
 

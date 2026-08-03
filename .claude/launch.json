@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "console-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/console-preview/serve.py"],
+      "port": 8756
+    },
+    {
+      "name": "bridge-ui",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "tools/agent-bell-bridge/ui"],
+      "port": 8765
+    }
+  ]
+}

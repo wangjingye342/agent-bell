@@ -1,0 +1,295 @@
+{
+ "connections": [
+  {
+   "pin": "U1:3V3",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "J1:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "J2:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "J4:5",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "R1:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "R2:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "R3:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "R5:1",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "Q1:E",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "J3:1",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "D1:K",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "C4:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "C1:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "C2:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "C3:2",
+   "kind": "power",
+   "net": "3V3"
+  },
+  {
+   "pin": "U1:5V",
+   "kind": "power",
+   "net": "5V"
+  },
+  {
+   "pin": "J4:4",
+   "kind": "power",
+   "net": "5V"
+  },
+  {
+   "pin": "U1:GND",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "J1:1",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "J2:3",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "J4:6",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "SW1:C",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "SW1:E",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "SW1:6",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "SW1:7",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "LS1:2",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "Q2:S",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "R7:2",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "C1:1",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "C2:1",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "C3:1",
+   "kind": "gnd",
+   "net": "GND"
+  },
+  {
+   "pin": "U1:GPIO5",
+   "kind": "net_port_bi",
+   "net": "OLED_SDA"
+  },
+  {
+   "pin": "J1:4",
+   "kind": "net_port_bi",
+   "net": "OLED_SDA"
+  },
+  {
+   "pin": "U1:GPIO6",
+   "kind": "net_port_bi",
+   "net": "OLED_SCL"
+  },
+  {
+   "pin": "J1:3",
+   "kind": "net_port_bi",
+   "net": "OLED_SCL"
+  },
+  {
+   "pin": "U1:GPIO4",
+   "kind": "net_port_bi",
+   "net": "TOUCH_SIG"
+  },
+  {
+   "pin": "J2:1",
+   "kind": "net_port_bi",
+   "net": "TOUCH_SIG"
+  },
+  {
+   "pin": "U1:GPIO1",
+   "kind": "net_port_bi",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "SW1:A",
+   "kind": "net_port_bi",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "R1:1",
+   "kind": "net_port_bi",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "U1:GPIO7",
+   "kind": "net_port_bi",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "SW1:B",
+   "kind": "net_port_bi",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "R2:1",
+   "kind": "net_port_bi",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "U1:GPIO20",
+   "kind": "net_port_bi",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "SW1:D",
+   "kind": "net_port_bi",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "R3:1",
+   "kind": "net_port_bi",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "U1:GPIO3",
+   "kind": "net_port_bi",
+   "net": "BUZZER_CTRL"
+  },
+  {
+   "pin": "R4:1",
+   "kind": "net_port_bi",
+   "net": "BUZZER_CTRL"
+  },
+  {
+   "pin": "U1:GPIO10",
+   "kind": "net_port_bi",
+   "net": "VIB_CTRL"
+  },
+  {
+   "pin": "R6:1",
+   "kind": "net_port_bi",
+   "net": "VIB_CTRL"
+  },
+  {
+   "pin": "U1:GPIO0",
+   "kind": "net_port_bi",
+   "net": "GPIO0"
+  },
+  {
+   "pin": "J4:1",
+   "kind": "net_port_bi",
+   "net": "GPIO0"
+  },
+  {
+   "pin": "U1:GPIO2",
+   "kind": "net_port_bi",
+   "net": "GPIO2"
+  },
+  {
+   "pin": "J4:2",
+   "kind": "net_port_bi",
+   "net": "GPIO2"
+  },
+  {
+   "pin": "U1:GPIO21",
+   "kind": "net_port_bi",
+   "net": "GPIO21"
+  },
+  {
+   "pin": "J4:3",
+   "kind": "net_port_bi",
+   "net": "GPIO21"
+  }
+ ],
+ "rules": {
+  "avoidTitleBlock": true,
+  "avoidPinFanout": true,
+  "staggerLabels": true,
+  "offsetRange": [
+   18,
+   80
+  ],
+  "offsetStep": 6,
+  "minLabelGap": 12
+ }
+}

@@ -1,0 +1,424 @@
+{
+  "id": "req_557",
+  "ok": true,
+  "result": {
+    "passed": false,
+    "summary": {
+      "floatingPins": 2,
+      "componentsWithFloating": 1,
+      "geomNetMismatches": 0,
+      "netMarkerMismatches": 0,
+      "multiNetWires": 0,
+      "wireCrossings": 2,
+      "wireOverPins": 0,
+      "zeroLengthWires": 0,
+      "danglingWires": 2,
+      "duplicateNetMarkers": 0,
+      "titleblockOverlaps": 1,
+      "markerOverlaps": 10,
+      "total": 16
+    },
+    "findings": [
+      {
+        "type": "floating-pin",
+        "level": "warn",
+        "designator": "U1",
+        "primitiveId": "c0f5f09bd3117bd2",
+        "pins": [
+          "4",
+          "5"
+        ],
+        "pinDetails": [
+          {
+            "number": "4",
+            "name": "GPIO8",
+            "x": 530,
+            "y": 420
+          },
+          {
+            "number": "5",
+            "name": "GPIO9",
+            "x": 530,
+            "y": 410
+          }
+        ],
+        "count": 2,
+        "message": "2 个引脚悬空(无导线连接,未打 NC 标识)"
+      },
+      {
+        "type": "wire-crossing",
+        "level": "warn",
+        "count": 1,
+        "message": "两条导线交叉(走线打结;改走通道/换 L 形拐点避开)",
+        "at": {
+          "x": 682.5,
+          "y": 267.5
+        }
+      },
+      {
+        "type": "wire-crossing",
+        "level": "warn",
+        "count": 1,
+        "message": "两条导线交叉(走线打结;改走通道/换 L 形拐点避开)",
+        "at": {
+          "x": 955,
+          "y": 460
+        }
+      },
+      {
+        "type": "dangling-wire",
+        "level": "warn",
+        "wirePrimitiveId": "cea117f68f1bb6e4",
+        "message": "悬挂导线(两端不接任何引脚/标识/导线,孤立残留)",
+        "at": {
+          "x": 590,
+          "y": 245
+        }
+      },
+      {
+        "type": "dangling-wire",
+        "level": "warn",
+        "wirePrimitiveId": "672868fb434438e4",
+        "message": "悬挂导线(两端不接任何引脚/标识/导线,孤立残留)",
+        "at": {
+          "x": 955,
+          "y": 480
+        }
+      },
+      {
+        "type": "titleblock-overlap",
+        "level": "warn",
+        "designator": "R7",
+        "primitiveId": "33b67a4ea1f83c67",
+        "message": "R7(part) 侵入标题栏 keep-out（重叠 21.00×9.00）— 移出图签区或换连线方向",
+        "componentType": "part",
+        "bbox": {
+          "minX": 519.5,
+          "minY": 145.5,
+          "maxX": 540.5,
+          "maxY": 154.5
+        },
+        "keepout": {
+          "minX": 468,
+          "minY": 0,
+          "maxX": 1170,
+          "maxY": 165
+        },
+        "overlapX": 21,
+        "overlapY": 9
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "3bf3732f41bea785",
+        "markerNet": "BUZZER_CTRL",
+        "message": "BUZZER_CTRL(netport) 与 GPIO2(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "3bf3732f41bea785",
+          "ade121192c8cb7e1"
+        ],
+        "bbox": {
+          "minX": 669.5,
+          "minY": 404.5,
+          "maxX": 700.5,
+          "maxY": 415.5
+        },
+        "other": {
+          "primitiveId": "ade121192c8cb7e1",
+          "componentType": "netport",
+          "net": "GPIO2",
+          "bbox": {
+            "minX": 699.5,
+            "minY": 394.5,
+            "maxX": 730.5,
+            "maxY": 405.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "3bf3732f41bea785",
+        "markerNet": "BUZZER_CTRL",
+        "message": "BUZZER_CTRL(netport) 与 TOUCH_SIG(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "3bf3732f41bea785",
+          "e3384b33cd514395"
+        ],
+        "bbox": {
+          "minX": 669.5,
+          "minY": 404.5,
+          "maxX": 700.5,
+          "maxY": 415.5
+        },
+        "other": {
+          "primitiveId": "e3384b33cd514395",
+          "componentType": "netport",
+          "net": "TOUCH_SIG",
+          "bbox": {
+            "minX": 699.5,
+            "minY": 414.5,
+            "maxX": 730.5,
+            "maxY": 425.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "4134d1a5e6a8842c",
+        "markerNet": "OLED_SDA",
+        "message": "OLED_SDA(netport) 与 OLED_SCL(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "4134d1a5e6a8842c",
+          "41d7c625e1771df6"
+        ],
+        "bbox": {
+          "minX": 114.5,
+          "minY": 599.5,
+          "maxX": 145.5,
+          "maxY": 610.5
+        },
+        "other": {
+          "primitiveId": "41d7c625e1771df6",
+          "componentType": "netport",
+          "net": "OLED_SCL",
+          "bbox": {
+            "minX": 84.5,
+            "minY": 609.5,
+            "maxX": 115.5,
+            "maxY": 620.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "45810926c72f82e6",
+        "markerNet": "ENC_DT",
+        "message": "ENC_DT(netport) 与 OLED_SCL(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "45810926c72f82e6",
+          "e9e0e9062dd4d892"
+        ],
+        "bbox": {
+          "minX": 469.5,
+          "minY": 424.5,
+          "maxX": 500.5,
+          "maxY": 435.5
+        },
+        "other": {
+          "primitiveId": "e9e0e9062dd4d892",
+          "componentType": "netport",
+          "net": "OLED_SCL",
+          "bbox": {
+            "minX": 439.5,
+            "minY": 434.5,
+            "maxX": 470.5,
+            "maxY": 445.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "87d3d942b2d58317",
+        "markerNet": "ENC_CLK",
+        "message": "ENC_CLK(netport) 与 ENC_SW(netport) 视觉重叠 11.00×21.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "87d3d942b2d58317",
+          "9b3704ac31bbe795"
+        ],
+        "bbox": {
+          "minX": 999.5,
+          "minY": 609.5,
+          "maxX": 1010.5,
+          "maxY": 640.5
+        },
+        "other": {
+          "primitiveId": "9b3704ac31bbe795",
+          "componentType": "netport",
+          "net": "ENC_SW",
+          "bbox": {
+            "minX": 999.5,
+            "minY": 599.5,
+            "maxX": 1010.5,
+            "maxY": 630.5
+          }
+        },
+        "overlapX": 11,
+        "overlapY": 21
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "8ece04e9d80747f5",
+        "markerNet": "GPIO0",
+        "message": "GPIO0(netport) 与 ENC_CLK(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "8ece04e9d80747f5",
+          "e25675c00ea37a5b"
+        ],
+        "bbox": {
+          "minX": 699.5,
+          "minY": 374.5,
+          "maxX": 730.5,
+          "maxY": 385.5
+        },
+        "other": {
+          "primitiveId": "e25675c00ea37a5b",
+          "componentType": "netport",
+          "net": "ENC_CLK",
+          "bbox": {
+            "minX": 669.5,
+            "minY": 384.5,
+            "maxX": 700.5,
+            "maxY": 395.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "931e134b2bfeeee6",
+        "markerNet": "GPIO21",
+        "message": "GPIO21(netport) 与 ENC_SW(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "931e134b2bfeeee6",
+          "b421a94909fbefbd"
+        ],
+        "bbox": {
+          "minX": 439.5,
+          "minY": 374.5,
+          "maxX": 470.5,
+          "maxY": 385.5
+        },
+        "other": {
+          "primitiveId": "b421a94909fbefbd",
+          "componentType": "netport",
+          "net": "ENC_SW",
+          "bbox": {
+            "minX": 469.5,
+            "minY": 384.5,
+            "maxX": 500.5,
+            "maxY": 395.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "ac8540cdb2fcb9f2",
+        "markerNet": "OLED_SDA",
+        "message": "OLED_SDA(netport) 与 OLED_SCL(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "ac8540cdb2fcb9f2",
+          "e9e0e9062dd4d892"
+        ],
+        "bbox": {
+          "minX": 469.5,
+          "minY": 444.5,
+          "maxX": 500.5,
+          "maxY": 455.5
+        },
+        "other": {
+          "primitiveId": "e9e0e9062dd4d892",
+          "componentType": "netport",
+          "net": "OLED_SCL",
+          "bbox": {
+            "minX": 439.5,
+            "minY": 434.5,
+            "maxX": 470.5,
+            "maxY": 445.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "ade121192c8cb7e1",
+        "markerNet": "GPIO2",
+        "message": "GPIO2(netport) 与 ENC_CLK(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "ade121192c8cb7e1",
+          "e25675c00ea37a5b"
+        ],
+        "bbox": {
+          "minX": 699.5,
+          "minY": 394.5,
+          "maxX": 730.5,
+          "maxY": 405.5
+        },
+        "other": {
+          "primitiveId": "e25675c00ea37a5b",
+          "componentType": "netport",
+          "net": "ENC_CLK",
+          "bbox": {
+            "minX": 669.5,
+            "minY": 384.5,
+            "maxX": 700.5,
+            "maxY": 395.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      },
+      {
+        "type": "marker-overlap",
+        "level": "warn",
+        "primitiveId": "b421a94909fbefbd",
+        "markerNet": "ENC_SW",
+        "message": "ENC_SW(netport) 与 VIB_CTRL(netport) 视觉重叠 1.00×1.00 — 换方向/offset 或 stagger",
+        "componentType": "netport",
+        "primitiveIds": [
+          "b421a94909fbefbd",
+          "cb21b3e218a18bab"
+        ],
+        "bbox": {
+          "minX": 469.5,
+          "minY": 384.5,
+          "maxX": 500.5,
+          "maxY": 395.5
+        },
+        "other": {
+          "primitiveId": "cb21b3e218a18bab",
+          "componentType": "netport",
+          "net": "VIB_CTRL",
+          "bbox": {
+            "minX": 439.5,
+            "minY": 394.5,
+            "maxX": 470.5,
+            "maxY": 405.5
+          }
+        },
+        "overlapX": 1,
+        "overlapY": 1
+      }
+    ]
+  },
+  "type": "response",
+  "version": "v1"
+}

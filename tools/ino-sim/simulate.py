@@ -160,11 +160,21 @@ def detect_backend(sketch_code):
 
 
 def find_proto_insert_line(code):
-    """Mirror the Arduino preprocessor: insert prototypes AFTER the sketch's
-    leading directives (its #include / #define / #if block), so prototypes that
-    reference library types (GFXfont, String, ...) compile. Returns the line
-    index (0-based) at which to insert, skipping comments, blank lines, and
-    preprocessor directives — including multi-line directives (trailing '\\')."""
+    """Mirror the Arduino (ctags-based) preprocessor: insert prototypes right
+    BEFORE the first top-level function definition. That keeps them after any
+    global type definitions (enums/structs the prototypes may reference) while
+    still ahead of every call site. Falls back to "after the leading directive
+    block" for sketches with no detectable function definition."""
+    scrubbed = strip_comments_and_strings(code)
+    ctrl = {"if", "for", "while", "switch", "do", "else", "return"}
+    for m in FUNC_DEF_RE.finditer(scrubbed):
+        start = m.start()
+        if scrubbed.count("{", 0, start) - scrubbed.count("}", 0, start) != 0:
+            continue                      # inside a class/function body
+        if m.group(2) in ctrl:
+            continue
+        return code.count("\n", 0, start)  # scrub preserves offsets/newlines
+    # -- fallback: after the leading #include / #define / #if block --
     lines = code.splitlines()
     last = 0  # default: top of file
     i = 0
@@ -237,7 +247,7 @@ def build_cpp(sketch_path, build_dir):
     return cpp_path, backend, protos
 
 
-def compile_and_link_u8g2(cpp_path, build_dir, exe_path):
+def compile_and_link_u8g2(cpp_path, build_dir, exe_path, sketch_dir):
     """U8g2 sketches (monochrome OLED). Compiles the vendored *real* U8g2 C core
     (cached) plus a host HAL that captures its full framebuffer, and links that
     with the runtime + sketch. Pixel-faithful, including the real CJK/Latin
@@ -248,9 +258,27 @@ def compile_and_link_u8g2(cpp_path, build_dir, exe_path):
     os.makedirs(obj_dir, exist_ok=True)
 
     c_inc = ["-I", U8G2_CLIB, "-I", U8G2_VENDOR]
+    # -DARDUINO 必须与 C++ 侧一致：它决定 u8x8_t 是否带 pins 成员（U8X8_USE_PINS），
+    # 两边不一致会导致结构体布局错位 → 画点越界段错误。
+    c_flags = [cc, "-O1", "-w", "-DARDUINO=10819", "-DESP32=1"]
 
     # 1) Vendored U8g2 C core + font subset → cached .o. The library never
     #    changes, so each file compiles once; delete build/u8g2_obj to rebuild.
+    #    缓存键包含编译命令：flags 变了（如新增 -D）自动整目录重编，避免混用两种结构体布局。
+    stamp_path = os.path.join(obj_dir, ".flags")
+    stamp = " ".join(c_flags)
+    old_stamp = None
+    try:
+        with open(stamp_path, "r", encoding="utf-8") as f:
+            old_stamp = f.read()
+    except OSError:
+        pass
+    if old_stamp != stamp:
+        for stale in glob.glob(os.path.join(obj_dir, "*.o")):
+            os.remove(stale)
+        with open(stamp_path, "w", encoding="utf-8") as f:
+            f.write(stamp)
+
     c_sources = sorted(glob.glob(os.path.join(U8G2_CLIB, "*.c")))
     c_sources.append(os.path.join(U8G2_BACKEND, "u8g2_fonts_subset.c"))
     if len(c_sources) < 2:
@@ -266,7 +294,7 @@ def compile_and_link_u8g2(cpp_path, build_dir, exe_path):
     for c in c_sources:
         o = os.path.join(obj_dir, os.path.splitext(os.path.basename(c))[0] + ".o")
         if not os.path.isfile(o):
-            proc = subprocess.run([cc, "-O1", "-w", "-c"] + c_inc + [c, "-o", o],
+            proc = subprocess.run(c_flags + ["-c"] + c_inc + [c, "-o", o],
                                   capture_output=True, text=True, errors="replace")
             if proc.returncode != 0:
                 log("u8g2 C compile FAILED: %s" % os.path.basename(c))
@@ -287,12 +315,15 @@ def compile_and_link_u8g2(cpp_path, build_dir, exe_path):
     ]
     cxx_inc = ["-I", os.path.join(SRC, "arduino_shim"),
                "-I", os.path.join(SRC, "runtime"),
-               "-I", U8G2_BACKEND, "-I", U8G2_VENDOR, "-I", U8G2_CLIB]
+               "-I", U8G2_BACKEND, "-I", U8G2_VENDOR, "-I", U8G2_CLIB,
+               "-I", sketch_dir]   # sketch 自带头文件（如预渲染位图帧）
     # SIM_DEMO strips the sketch's networking; INO_SIM enables scenario injection;
     # SIM_U8G2 turns on the runtime's monochrome-buffer snapshot path.
     cmd = [cxx, "-std=c++17", "-O1", "-w",
            "-DARDUINO=10819", "-DESP32=1", "-DINO_SIM=1", "-DSIM_DEMO=1", "-DSIM_U8G2=1",
            "-Wno-narrowing", "-fno-strict-aliasing"]
+    if os.name == "nt":
+        cmd.append("-static")   # 静态链运行库：避免加载 PATH 里别家 mingw 的 libstdc++ DLL（ABI 不合会段错误）
     cmd += cxx_inc + cxx_sources + objs + ["-o", exe_path]
 
     log("u8g2: compiling sketch + runtime and linking...")
@@ -306,10 +337,11 @@ def compile_and_link_u8g2(cpp_path, build_dir, exe_path):
     return True
 
 
-def compile_and_link(cpp_path, backend, build_dir, exe_path):
+def compile_and_link(cpp_path, backend, build_dir, exe_path, sketch_dir):
     if backend == "u8g2":
-        return compile_and_link_u8g2(cpp_path, build_dir, exe_path)
+        return compile_and_link_u8g2(cpp_path, build_dir, exe_path, sketch_dir)
     include_dirs = [
+        sketch_dir,
         os.path.join(SRC, "arduino_shim"),
         os.path.join(SRC, "gfx_backend"),
         os.path.join(SRC, "tft_espi_backend"),
@@ -332,6 +364,8 @@ def compile_and_link(cpp_path, backend, build_dir, exe_path):
     cmd = [cxx, "-std=c++17", "-O1", "-w",
            "-DARDUINO=10819", "-DESP32=1", "-DINO_SIM=1",
            "-Wno-narrowing", "-fno-strict-aliasing"]
+    if os.name == "nt":
+        cmd.append("-static")   # 同 u8g2 路径：避免加载 PATH 里别家 mingw 的 libstdc++ DLL（ABI 不合会段错误）
     for d in include_dirs:
         cmd += ["-I", d]
     cmd += sources
@@ -383,7 +417,8 @@ def main():
     # Windows compilers append .exe; keep the launch path in sync with what the
     # compiler actually writes so subprocess.run below can find the binary.
     exe_path = os.path.join(build_dir, "sim" + (".exe" if os.name == "nt" else ""))
-    if not compile_and_link(cpp_path, backend, build_dir, exe_path):
+    if not compile_and_link(cpp_path, backend, build_dir, exe_path,
+                            os.path.dirname(sketch_path)):
         return 1
 
     log("running scenario: %s" % os.path.relpath(scenario, TOOL_DIR))

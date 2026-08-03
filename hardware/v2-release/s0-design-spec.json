@@ -1,0 +1,243 @@
+{
+  "project": "AgentBell",
+  "version": "s0-final-11-SHIPPED",
+  "date": "2026-07-27",
+  "source_of_truth": "agent_bell/agent_bell.ino 引脚定义(2026-07-27 核实)",
+  "pinout": {
+    "GPIO1": "ENC_CLK(编码器A相,内部上拉)",
+    "GPIO3": "BUZZER_CTRL(低电平有效,idle高=静音)",
+    "GPIO4": "TOUCH_SIG(TTP223数字输入)",
+    "GPIO5": "OLED_SDA(I2C,0x3C)",
+    "GPIO6": "OLED_SCL",
+    "GPIO7": "ENC_DT(编码器B相,内部上拉)",
+    "GPIO10": "VIB_CTRL(高电平有效)",
+    "GPIO20": "ENC_SW(编码器按压,低有效,内部上拉)",
+    "free": [
+      "GPIO0",
+      "GPIO2",
+      "GPIO21"
+    ],
+    "reserved_not_broken_out": [
+      "GPIO8(板载LED/strapping)",
+      "GPIO9(BOOT/strapping)"
+    ]
+  },
+  "modules": [
+    {
+      "name": "MCU",
+      "parts": [
+        "U1",
+        "C1"
+      ],
+      "page": "P1",
+      "zone": "center",
+      "desc": "ESP32-C3 SuperMini 整模块贴焊(C9900147397) + C1=22uF/0805 bulk(C45783)"
+    },
+    {
+      "name": "OLED_CONN",
+      "parts": [
+        "J1",
+        "C2"
+      ],
+      "page": "P1",
+      "zone": "left-top",
+      "desc": "OLED 1x4 焊线孔(C9900010184) + C2=100nF/0603(C14663)"
+    },
+    {
+      "name": "TOUCH_CONN",
+      "parts": [
+        "J2"
+      ],
+      "page": "P1",
+      "zone": "left-bottom",
+      "desc": "触摸模块 1x3 焊线孔(C9900010031)"
+    },
+    {
+      "name": "EXPANSION",
+      "parts": [
+        "J4"
+      ],
+      "page": "P1",
+      "zone": "left-bottom",
+      "desc": "扩展 1x6 焊线孔(C9900021383): IO0/IO2/IO21/5V/3V3/GND"
+    },
+    {
+      "name": "ENCODER",
+      "parts": [
+        "SW1",
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "page": "P1",
+      "zone": "right-top",
+      "desc": "EC11 贴片版(C9900001788,SMD不穿板,背面藏SuperMini) + 3x10k/0603 上拉(C25804)"
+    },
+    {
+      "name": "BUZZER_DRV",
+      "parts": [
+        "LS1",
+        "Q1",
+        "R4",
+        "R5"
+      ],
+      "page": "P1",
+      "zone": "right",
+      "desc": "QMB-09B-03 9mm插件无源(C96256) + SS8550 PNP(C8542) + R4=1k(C21190) + R5=10k 上拉"
+    },
+    {
+      "name": "VIB_DRV",
+      "parts": [
+        "J3",
+        "Q2",
+        "R6",
+        "R7",
+        "D1",
+        "C4",
+        "C3"
+      ],
+      "page": "P1",
+      "zone": "center-bottom",
+      "desc": "马达 1x2 焊线孔(C9900010030) + AO3400(C20917) + R6=100R(C22775) + R7=10k 下拉 + D1=SS34 续流(C8678) + C4=100nF 消刷噪 + C3=10uF/0805(C440198)"
+    }
+  ],
+  "pages": [
+    {
+      "name": "P1",
+      "sheet": "A4",
+      "modules": [
+        "MCU",
+        "POWER",
+        "OLED_CONN",
+        "TOUCH_CONN",
+        "ENCODER",
+        "BUZZER_DRV",
+        "VIB_DRV",
+        "EXPANSION"
+      ]
+    }
+  ],
+  "nets": {
+    "power": [
+      "3V3",
+      "5V",
+      "GND"
+    ],
+    "signal": [
+      "ENC_CLK",
+      "ENC_DT",
+      "ENC_SW",
+      "BUZZER_CTRL",
+      "VIB_CTRL",
+      "TOUCH_SIG",
+      "OLED_SDA",
+      "OLED_SCL",
+      "IO0",
+      "IO2",
+      "IO21"
+    ]
+  },
+  "stackup": {
+    "layers": 2,
+    "groundStrategy": "pour",
+    "note": "载板稀疏、仅3V3/5V/GND,2层够;PCB里程碑时可复议"
+  },
+  "rf": {
+    "parts": [
+      "U1"
+    ],
+    "keepoutLayers": "all",
+    "note": "SuperMini 板载陶瓷天线端,载板上该端不布铜不走线"
+  },
+  "board": {
+    "outline": "custom: 36.5x24mm 左上R10圆角",
+    "holes": "3x Ø3定位柱孔 BL(4,3.5) BR(W-3.5,3.5) TR(W-3.5,20.5)"
+  },
+  "interfaces": [],
+  "costTier": "standard",
+  "assembly": {
+    "profile": "hand-solder",
+    "packageFloor": "0603",
+    "sides": "double(U1贴底面,其余顶面)"
+  },
+  "blocks_used": [],
+  "block_gaps": [
+    "无源蜂鸣器PNP高侧驱动",
+    "小马达NMOS低侧驱动",
+    "EC11编码器接口"
+  ],
+  "firmware_compat_notes": [
+    "蜂鸣器驱动极性必须低电平有效(固件静音=输出高)",
+    "震动驱动极性必须高电平有效(VIB_ACTIVE_HIGH=true)",
+    "编码器三脚全靠上拉(固件INPUT_PULLUP+外部10k双保险),不加去抖电容",
+    "GPIO20被编码器SW占用(=UART0 RX),调试走USB CDC,扩展口不引20"
+  ],
+  "user_decisions": {
+    "mcu_mount": "SuperMini 整模块贴焊在载板上(SMD 16P 焊盘, lib C9900147397),不用排母插座",
+    "oled": "4 个焊线孔(GND/VCC/SCL/SDA),用户焊线连接屏幕",
+    "touch": "触摸模块保持独立小板,3 个焊线孔(SIG/VCC/GND)焊线连接",
+    "onboard": "蜂鸣器+驱动、震动驱动、EC11 编码器全部板载",
+    "expansion": "6 个焊线孔,不装排针",
+    "assembly": "手工焊接,0603 起步",
+    "size": "尽量小(compact)"
+  },
+  "bom": {
+    "U1": "C9900147397 ESP32C3-SuperMini SMD16P",
+    "J1": "C9900010184 1x4 2.54",
+    "J2": "C9900010031 1x3 2.54",
+    "J3": "C9900010030 1x2 2.54",
+    "J4": "C9900021383 1x6 2.54",
+    "SW1": "C9900001788 EC1106S 贴片EC11",
+    "LS1": "C96256 QMB-09B-03 9mm插件无源2.7kHz",
+    "Q1": "C8542 SS8550 SOT-23",
+    "Q2": "C20917 AO3400A SOT-23",
+    "D1": "C8678 SS34 SMA",
+    "R1/R2/R3/R5/R7": "C17414 10k 0805 1%(用户0805电阻包有)",
+    "R6": "C17408 100R 0805(包内有)",
+    "C1": "C45783 22uF 0805(包内22uF/6.3V可代)",
+    "C2/C4": "C49678 100nF 0805 50V(用户0805电容包有)",
+    "C3": "C440198 10uF 0805",
+    "U2": "C5137090 TP4054 SOT-23-5 充电",
+    "R8": "C4382 5.6k 0805(包内有;178mA=0.71C for 250mAh)",
+    "LED1": "C2296 黄0805 充电灯",
+    "C5": "C440198 10uF 0805",
+    "D2": "C8678 SS34 电池隔离",
+    "J5": "C9900010030 1x2 电池焊线孔",
+    "R4/R9": "C17513 1k 0805(包内有)",
+    "C3/C5": "C440198 10uF 0805(包内10uF/10V可代)"
+  },
+  "target_page": {
+    "documentUuid": "fb3a6ed7683b04aa",
+    "board": "Board3(schematic3+PCB3)",
+    "note": "页e9fb…与a5e7…已有用户内容,勿动"
+  },
+  "pcb_result": {
+    "board": "48x24mm 左上R10圆角 双面 2层 (2026-07-28 v2)",
+    "holes": "3x Ø3定位柱: BL(4,3.5) BR(44.5,3.5) TR(44.5,20.5) 孔边距2/2.5mm",
+    "encoder": "SW1轴心=弧心(10,14),正面",
+    "u1": "背面贴装,天线端(GPIO0/21)朝上入禁布窗,USB端(5V/GPIO5)朝下悬出~2.4mm,官方引脚图核对无误",
+    "battery": "TP4054@150mA + SS34隔离 + J5焊线孔(B+/B-右下); 官方5V脚支持3.3-6V输入已核对",
+    "wire_holes": "J2触摸(左下GND/3V3/SIG) J4扩展(右中IO21/IO2/IO0) J1 OLED(右缘SDA/SCL/3V3/GND) J3马达(右上M+/M-) J5电池(右下B+/B-)",
+    "drc": "0 violations (2026-07-29 终裁, 含蜂鸣器转90/销孔净距1.8/裸铜条条款全过)",
+    "silk": "方向标USB/ANT双面, U1大字已清空, 孔位全标注",
+    "known_cosmetic": "背面器件型号文字未镜像(API限制); DFM warn级: 锐角/平行耦合/丝印压盘若干",
+    "assembly_band": "SuperMini两侧焊盘列±2.5mm手焊安全带已清场(2026-07-29); U1焊盘列间距经背面延长铜条扩至17.5mm(适配贴装余量,含阻焊开窗)",
+    "buzzer": "LS1转90°针脚竖排, 距延长焊盘条2.75mm"
+  },
+  "battery": {
+    "type": "3.7V锂电 250mAh起",
+    "charge": "TP4054@178mA(R8=5.6k,用户包内;更快且250mAh安全)",
+    "path": "USB(SuperMini 5V脚)→TP4054→电池; 电池→SS34→5V轨→板载LDO",
+    "indicator": "黄LED充电亮/充满灭"
+  },
+  "component_audit_2026_07_28": {
+    "TP4054": "OK — 5V入在4-9V内; 6.8k→147mA(公式核实); 4.2V±1%; CHRG#开漏带LED合规(官方典型应用同款); 热余量大+热调节保护",
+    "AO3400": "OK — 电流24x/电压8x裕量; 3.3V栅压有官方2.5V档背书(Rds≤48mΩ); 开关损耗可忽略",
+    "SS8550": "OK — 7.6x/18x裕量,饱和过驱3.5-5.8x,功耗7%; 建议项:蜂鸣器线圈感性,可选并联续流二极管(原型机无二极管长期工作正常,能量微焦级)",
+    "SS34": "OK — 两用途电流余量巨大; D2压降实测曲线: 电池4.2V→5V脚3.9V, 3.3V→3.0V; 漏电µA级",
+    "QMB-09B": "OK — 3.3V在1.5-5V工作范围; 2.7kHz正是谐振点; 峰值电流最坏~200-300mA(线圈16±5Ω),SS8550 1.5A扛得住,饱和略浅但功耗仍7%级",
+    "ME6211(板载LDO)": "MARGINAL — 峰值550mA超额定500mA(typ)未超绝对最大600mA,亚毫秒突发靠42µF储能兜底; 电池模式必然dropout: 3.3V轨在电池供电时实际riding 2.9-3.2V(ESP32-C3推荐下限3.0,brownout~2.6),原型机同工况长期验证可用。这是所有SuperMini+锂电方案的共性,非本板独有缺陷"
+  },
+  "user_kit_note": "2026-07-29: 全部R/C统一0805并对齐用户自备0805阻容包(仅LED1黄0805需单独备)",
+  "gerber": "AgentBell-Gerber.zip 2026-07-29 22:11 导出, 15文件, 外形48.0x24.0mm已验"
+}

@@ -1,0 +1,11 @@
+#define OLED_SDA   5      // I2C 数据
+#define OLED_SCL   6      // I2C 时钟
+#define OLED_ADDR  0x3C   // 少数屏是 0x3D
+#define TOUCH_PIN  4      // 触摸模块 SIG（数字输入）
+#define BUZZER_PIN 3      // 蜂鸣器 I/O
+#define VIB_PIN    10     // 震动模块 IN
+#define ENC_CLK 1     // A 相
+#define ENC_DT  7     // B 相
+#define ENC_SW  20    // 按压（低有效，用内部上拉）
+#define ENC_RAW_PER_DETENT 2   // 本编码器每个物理档位产生的正交沿数（实测 div=4 时每 2 档动一下 → 2/档）
+#define VIB_ACTIVE_HIGH     true    // 震动模块触发极性（装上后不对就翻这里）

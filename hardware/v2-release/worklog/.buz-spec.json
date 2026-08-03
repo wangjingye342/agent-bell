@@ -1,0 +1,5 @@
+{"connections":[
+ {"pin":"LS1:1","kind":"net_port_in","net":"BZ_DRV"},
+ {"pin":"Q1:3","kind":"net_port_in","net":"BZ_DRV"},
+ {"pin":"LS1:2","kind":"gnd","net":"GND"}
+],"rules":{"avoidTitleBlock":true,"avoidPinFanout":true,"staggerLabels":true,"offsetRange":[30,80],"offsetStep":10,"minLabelGap":14}}

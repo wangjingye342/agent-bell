@@ -1,5 +1,5 @@
 // ============================================================================
-//  AgentBell 智能体门铃 — ESP32-C3 SuperMini + SSD1306 128x64 OLED
+//  AgentBell — ESP32-C3 SuperMini + SSD1306 128x64 OLED 智能体提醒设备
 // ----------------------------------------------------------------------------
 //  作用：电脑上的 Claude Code / Codex 完成一轮对话时，通过局域网 HTTP 通知本设备，
 //        它会「蜂鸣 + 震动」并在 OLED 上显示：哪台电脑、哪个智能体、哪个对话。
@@ -7,7 +7,7 @@
 //  架构：本设备是 HTTP 服务器（局域网内任意电脑都能 push）。电脑侧用 Claude 的
 //        Stop hook / Codex 的 notify 程序，在对话结束时 POST /notify 过来。
 //
-//  录音→语音识别→回填输入框那部分留待以后（触摸手势、麦克风引脚已预留）。
+//  录音→语音识别→回填输入框那部分留待以后（GPIO4 已空出，可留给麦克风）。
 //
 //  编译（Huge App 分区容纳中文字体）：
 //    arduino-cli compile --fqbn esp32:esp32:esp32c3:PartitionScheme=huge_app \
@@ -18,16 +18,22 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <U8g2lib.h>
+#include <time.h>          // 待机屏时钟：SNTP 同步后 time()/localtime() 取本地时间
+#include <sys/time.h>      // settimeofday（SIM_DEMO 预览注入假时间用）
 
 #ifndef SIM_DEMO
   #include <WiFi.h>
   #include <WebServer.h>
   #include <ESPmDNS.h>
+  #include <DNSServer.h>     // 配网热点的强制门户（captive portal）DNS
   #include <Preferences.h>   // 把网页里的开关存进 NVS，掉电不丢
 #endif
 
 #ifdef INO_SIM
   #include <sim_inject.h>    // ino-sim 屏幕模拟器：从 scenario 的 var 注入界面数据
+#else
+  #include <esp_sleep.h>     // 「关机」=深睡眠；转动编码器（GPIO1）唤醒
+  #include <driver/gpio.h>   // gpio_hold_en：睡眠期把蜂鸣/震动脚锁在「不响」电平
 #endif
 
 // 前置声明：有函数在这两个类型定义之前被 arduino-cli 自动生成原型引用（Note* / ListAnim&），先声明避免"未命名类型"
@@ -35,32 +41,30 @@ struct Note;
 struct ListAnim;
 struct SetMeta;
 enum SubMenu { SUB_NONE, SUB_MELODY };                          // 选项子列表（当前仅提示音用竖列表）
-enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCDIR, SET_ENCSENS };  // 滑块设置项（定义在顶部，供自动原型引用）
+enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE };  // 滑块设置项（定义在顶部，供自动原型引用）
 
 // ===== 硬件引脚（ESP32-C3 SuperMini，全部避开 strapping 脚 2/8/9）=====
 #define OLED_SDA   5      // I2C 数据
 #define OLED_SCL   6      // I2C 时钟
 #define OLED_ADDR  0x3C   // 少数屏是 0x3D
-#define TOUCH_PIN  4      // 触摸模块 SIG（数字输入）
 #define BUZZER_PIN 3      // 蜂鸣器 I/O
 #define VIB_PIN    10     // 震动模块 IN
-// 麦克风（以后录音用）：原预留的 7/20 已被编码器占用，录音引脚以后再规划
+// 触摸模块已移除（2026-07-30）：其"返回"功能与编码器长按完全重合，PCB 放不下遂砍掉。
+// GPIO4 因此空出 —— 麦克风（以后录音用）可优先考虑它（原预留的 7/20 已被编码器占用）。
 // —— 旋转编码器 HW-040（⚠ 电源脚 + 接 3V3，绝不能接 5V！输出电平跟随供电，5V 会烧 C3）——
-#define ENC_CLK 1     // A 相
+#define ENC_CLK 1     // A 相（兼作「关机」的深睡眠唤醒脚：C3 只有 GPIO0-5 能唤醒，恰好在范围内）
 #define ENC_DT  7     // B 相
-#define ENC_SW  20    // 按压（低有效，用内部上拉）
-#define ENC_RAW_PER_DETENT 2   // 本编码器每个物理档位产生的正交沿数（实测 div=4 时每 2 档动一下 → 2/档）
+#define ENC_SW  20    // 按压（低有效，用内部上拉；不在 GPIO0-5 内 → 关机后按它无法开机，得转旋钮）
+#define ENC_RAW_PER_DETENT 4   // 本编码器每个物理档位产生的正交沿数（v2 PCB 板载编码器实测 4/档；旧 HW-040 模块是 2/档，换回模块记得改回 2）
 // 旋转方向 encReversed、灵敏度 encDetents（每几档动一步）都是运行时设置（菜单/网页可调）
 
 // ===== 模块触发极性 =====
 // 蜂鸣器：无源 + 低电平触发（PNP 驱动），发声/静音逻辑在 ToneBuzzer 内处理，无需在此配。
 #define VIB_ACTIVE_HIGH     true    // 震动模块触发极性（装上后不对就翻这里）
 
-// ===== 触摸键 =====
-static const unsigned long TOUCH_DEBOUNCE_MS = 25;   // 触摸键现在只作"返回"：去抖后单次按下即触发
-
 // ===== 联网配置 =====
-// WiFi 凭据放在 secrets.h（已 gitignore，不上传）。有它就用你的真实凭据；没有（如别人克隆仓库）则用占位符，照样能编译。
+// WiFi 凭据来源（优先级）：NVS 存的（配网写入）→ secrets.h（编译期烧录）→ 占位符。
+// 到了陌生网络：开机连不上 → 自动开 AgentBell-XXXX 热点 + 配置页；也可菜单「重新配网」手动进。
 #if __has_include("secrets.h")
   #include "secrets.h"
 #else
@@ -68,6 +72,8 @@ static const unsigned long TOUCH_DEBOUNCE_MS = 25;   // 触摸键现在只作"�
   const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
 #endif
 const char* MDNS_NAME = "agent-bell";      // mDNS 主机名（仅供 /notify 发现，界面不再显示）
+char wifiSsid[33] = "";                    // 实际使用的凭据（loadWifiCred 决定来源）
+char wifiPass[65] = "";
 
 // ============================================================================
 //  声音配置（想换提示音，改这里就够了）
@@ -98,10 +104,10 @@ static const Melody MELODIES[] = {
 static const int MEL_N = sizeof(MELODIES) / sizeof(MELODIES[0]);
 static const uint16_t ALERT_VIB[]  = { 450, 180, 450 };    // 通知震动：长震-停-长震
 // —— 按键 / 反馈音（短促，跟随强度滑条）——
-static const ToneSeg TAP_TONES[]   = { {3000, 3000, 45} };  // 触摸/旋钮反馈：短促「嘀」
+static const ToneSeg TAP_TONES[]   = { {3000, 3000, 45} };  // 旋钮反馈：短促「嘀」
 static const ToneSeg FB_TONES[]    = { {2637, 2637, 110} }; // 调强度时的反馈音
 static const uint16_t FB_VIB[]     = { 220 };              // 调强度反馈短震
-static const uint16_t TAP_VIB[]    = { 95 };               // 触摸/旋钮反馈：轻震（够长以启动马达）
+static const uint16_t TAP_VIB[]    = { 95 };               // 旋钮反馈：轻震（够长以启动马达）
 
 // 蜂鸣器是无源的：靠方波频率发声（音高可调）；震动马达用 PWM 占空比调强度。
 static const uint32_t VIB_FREQ = 20000;   // 震动马达 PWM 载波，占空比=震动强度
@@ -111,6 +117,8 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /*reset=*/ U8X8_PIN_NONE);
 // 中文用文泉驿 GB2312 全字库（存 flash，故需 huge_app）；大号拉丁字体给智能体名。
 #define FONT_CN   u8g2_font_wqy12_t_gb2312
 #define FONT_BIG  u8g2_font_helvB14_tr
+#define FONT_CLOCK u8g2_font_logisoso20_tn   // 待机屏时钟数字（纯数字字体，含 : 和 -）
+#define FONT_CLOCK_XL u8g2_font_logisoso26_tn // 「大字时间」样式用更大号数字
 #include "astronaut_frames.h"   // 绕轴自转太空人逐帧位图（tools/gen_astronaut.py 生成）
 
 #ifndef SIM_DEMO
@@ -330,7 +338,17 @@ int  alertTone     = 0;       // 选用的提示音索引（对应 MELODIES）
 int  feedbackMode  = 0;       // 操作反馈：0=声+震 1=仅震 2=仅声 3=无
 int  fbVol         = 60;      // 操作反馈·音量（与通知分开；够明显但比通知小）
 int  fbVibVol      = 75;      // 操作反馈·震动强度（与通知分开；需高于马达启动阈值）
-int  touchIdleLevel = -1;         // 开机采样的触摸空闲电平（自动兼容高/低有效）
+int  leftStyle     = 0;       // 待机屏左半模块索引（对应 PANE_NAMES）
+int  rightStyle    = 1;       // 待机屏右半模块索引
+// ===== 待机屏半屏模块池（左右两半都是 64×64，同一池子里任选，菜单/API/桥接共用）=====
+// 模块渲染函数在下方"待机屏模块"一节定义；这里先声明，供函数指针表引用。
+static void paneAstro(int x0);     static void paneClock(int x0);
+static void paneAnalog(int x0);    static void paneBigTime(int x0);
+static void paneCalendar(int x0);  static void paneInfo(int x0);
+static void paneRadar(int x0);     static void paneMeteor(int x0);
+static const char* PANE_NAMES[] = {"宇航员", "数字时钟", "模拟表盘", "竖排大钟", "日历", "信息面板", "雷达扫描", "流星夜空"};
+static void (* const PANE_FNS[])(int) = {paneAstro, paneClock, paneAnalog, paneBigTime, paneCalendar, paneInfo, paneRadar, paneMeteor};
+static const int PANE_N = sizeof(PANE_NAMES) / sizeof(PANE_NAMES[0]);
 bool screenOff   = false;         // 屏幕是否熄灭（运行时，不持久）
 bool notifyWakes = true;          // 熄屏时来通知是否自动亮屏
 
@@ -340,7 +358,6 @@ UiState uiState = UI_IDLE;
 SubMenu curSub = SUB_NONE;        // 主菜单里进入的"选项子列表"（当前仅提示音）
 SetId curSet = SET_BUZVOL;        // 当前正在调的滑块设置项
 int   mainSel = 0, subSel = 0;    // 主列表 / 子列表当前选中项
-bool  uiBack = false;             // 触摸键=返回
 unsigned long lastInput = 0;      // 最近交互（15s 回待机）
 unsigned long melSettleAt = 0;    // 提示音停留自动试听计时
 int   melPreviewed = -1;
@@ -350,20 +367,53 @@ float sliderAnim = 0;             // 滑块 thumb 缓动位置（0..1）
 
 #ifndef SIM_DEMO
 Preferences prefs;
+
+// ============================================================================
+//  WiFi 凭据（NVS 优先，secrets.h 兜底）+ AP 配网模式
+// ============================================================================
+bool apMode = false;              // 当前是否在配网热点模式
+char apSsid[20] = "";             // AgentBell-XXXX（XXXX=MAC 尾两字节）
+unsigned long apStartedAt = 0;    // 配网模式起始时刻（无人配网 10min 自动重启重试）
+DNSServer dnsServer;              // 强制门户：所有域名都解析到设备自己
+
+static void loadWifiCred() {
+  prefs.begin("agentbell", true);
+  String s = prefs.getString("wifi_ssid", "");
+  String p = prefs.getString("wifi_pass", "");
+  prefs.end();
+  if (s.length()) {                          // NVS 里有配网写入的凭据 → 优先
+    strlcpy(wifiSsid, s.c_str(), sizeof(wifiSsid));
+    strlcpy(wifiPass, p.c_str(), sizeof(wifiPass));
+  } else {                                   // 否则用编译期的 secrets.h
+    strlcpy(wifiSsid, WIFI_SSID, sizeof(wifiSsid));
+    strlcpy(wifiPass, WIFI_PASS, sizeof(wifiPass));
+  }
+}
+
+static void saveWifiCred(const char* ssid, const char* pass) {
+  prefs.begin("agentbell", false);
+  prefs.putString("wifi_ssid", ssid);
+  prefs.putString("wifi_pass", pass);
+  prefs.end();
+}
+
 static void loadSettings() {
   prefs.begin("agentbell", true);          // 只读
   buzzerEnabled = prefs.getBool("buzz", true);
   vibEnabled    = prefs.getBool("vib",  true);
   dnd           = prefs.getBool("dnd",  false);
-  buzzerVol     = prefs.getInt("bvol", 100);
-  vibVol        = prefs.getInt("vvol", 100);
+  buzzerVol     = prefs.getInt("bvol", 100); if (buzzerVol < 0 || buzzerVol > 100) buzzerVol = 100;
+  vibVol        = prefs.getInt("vvol", 100); if (vibVol < 0 || vibVol > 100) vibVol = 100;
   alertTone     = prefs.getInt("tone", 0);
   if (alertTone < 0 || alertTone >= MEL_N) alertTone = 0;
   encReversed   = prefs.getBool("encrev", false);
   encDetents    = prefs.getInt("encdet", 1); if (encDetents < 1 || encDetents > 3) encDetents = 1;
   feedbackMode  = prefs.getInt("fb", 0);     if (feedbackMode < 0 || feedbackMode > 3) feedbackMode = 0;
-  fbVol         = prefs.getInt("fbv2", 60);    // 新键：忽略旧的过低值，用新默认
-  fbVibVol      = prefs.getInt("fbvv2", 75);
+  fbVol         = prefs.getInt("fbv2", 60);  if (fbVol < 0 || fbVol > 100) fbVol = 60;      // 新键：忽略旧的过低值，用新默认
+  fbVibVol      = prefs.getInt("fbvv2", 75); if (fbVibVol < 0 || fbVibVol > 100) fbVibVol = 75;
+  notifyWakes   = prefs.getBool("nwake", true);   // 熄屏时来通知是否自动亮屏
+  leftStyle     = prefs.getInt("lsty", 0);   if (leftStyle < 0 || leftStyle >= PANE_N) leftStyle = 0;
+  rightStyle    = prefs.getInt("rsty", 1);   if (rightStyle < 0 || rightStyle >= PANE_N) rightStyle = 1;
   prefs.end();
   buzzer.setVolume(buzzerVol);
   vibrator.setVolume(vibVol);
@@ -381,6 +431,9 @@ static void saveSettings() {
   prefs.putInt("fb", feedbackMode);
   prefs.putInt("fbv2", fbVol);
   prefs.putInt("fbvv2", fbVibVol);
+  prefs.putBool("nwake", notifyWakes);
+  prefs.putInt("lsty", leftStyle);
+  prefs.putInt("rsty", rightStyle);
   prefs.end();
 }
 #endif
@@ -395,13 +448,69 @@ static void setScreen(bool on) {
 }
 
 // ============================================================================
+//  关机：外设全部安静 + 深度睡眠（µA 级）。转动旋钮开机（按键 GPIO20 不在
+//  C3 的唤醒脚 0-5 范围内，唤不了）。本编码器每档翻转一次 CLK、静止电平在
+//  档位间高/低交替，所以唤醒极性睡前按「当前电平的反相」布防：一转即醒。
+//  唤醒 = 复位重启，从 setup() 重新来（开机 ~2s，走正常连 WiFi 流程）。
+// ============================================================================
+static void powerOff() {
+#ifdef INO_SIM
+  setScreen(false); uiState = UI_IDLE;    // 仿真主机端没有深睡，退化为熄屏
+#else
+  buzzer.stop();
+  vibrator.stop();
+
+  // 告别画面，顺便告诉用户怎么开机
+  u8g2.setPowerSave(0);
+  u8g2.clearBuffer();
+  u8g2.setFont(FONT_CN);
+  u8g2.drawUTF8(40, 28, "已关机");
+  u8g2.drawUTF8(28, 48, "旋转旋钮开机");
+  u8g2.sendBuffer();
+
+#ifndef SIM_DEMO
+  saveSettings();                          // 设置落盘（NVS）
+  server.stop();
+  WiFi.disconnect(true);                   // 断开并关 WiFi 射频
+  WiFi.mode(WIFI_OFF);
+#endif
+  delay(1500);                             // 留人看清提示
+  u8g2.setPowerSave(1);                    // OLED 睡眠（~10µA）
+
+  // 蜂鸣（低有效，静默=高）/ 震动（高有效，静默=低）脚锁到「不响」电平再睡：
+  // 深睡后数字引脚会悬空，PNP/驱动管一旦误导通，白耗几十 mA 甚至马达空转。
+  ledcDetach(BUZZER_PIN);
+  ledcDetach(VIB_PIN);
+  pinMode(BUZZER_PIN, OUTPUT); digitalWrite(BUZZER_PIN, HIGH);
+  pinMode(VIB_PIN, OUTPUT);    digitalWrite(VIB_PIN, VIB_ACTIVE_HIGH ? LOW : HIGH);
+  gpio_hold_en((gpio_num_t)BUZZER_PIN);
+  gpio_hold_en((gpio_num_t)VIB_PIN);
+  gpio_deep_sleep_hold_en();
+
+  // 唤醒布防：CLK 当前电平的反相触发（见函数头注释）
+  detachInterrupt(digitalPinToInterrupt(ENC_CLK));
+  detachInterrupt(digitalPinToInterrupt(ENC_DT));
+  bool clkHigh = (digitalRead(ENC_CLK) == HIGH);
+  esp_deep_sleep_enable_gpio_wakeup(1ULL << ENC_CLK,
+      clkHigh ? ESP_GPIO_WAKEUP_GPIO_LOW : ESP_GPIO_WAKEUP_GPIO_HIGH);
+  Serial.println("[power] 深度睡眠，转动旋钮唤醒");
+  Serial.flush();
+  esp_deep_sleep_start();                  // 不返回
+#endif
+}
+
+// ============================================================================
 //  报警：入队 + 蜂鸣 + 震动
 // ============================================================================
 void fireAlert(const Note& n) {
+#ifndef SIM_DEMO
+  if (uiState == UI_SLIDER) saveSettings();       // 通知顶掉滑块/样式选择页前，先把已改的值存盘
+#endif
   addNote(n);
   uiState = UI_NOTE;                              // 通知打断任何界面
-  if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len, 100);   // 通知：选用的提示音，满音量
-  if (!dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]), 100);
+  // 不传音量覆盖 → 用 setVolume 同步进来的「蜂鸣强度/震动强度」设置值
+  if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len);
+  if (!dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]));
   if (screenOff && notifyWakes) setScreen(true);   // 熄屏时按设置决定是否自动亮屏
   needRender = true;
   Serial.printf("[notify] %s / %s / %s\n", n.computer, n.agent, n.conversation);
@@ -419,22 +528,6 @@ static void timeAgo(unsigned long recv, char* out, size_t n) {
   else                snprintf(out, n, "%luh前", s / 3600);
 }
 
-#ifndef SIM_DEMO
-static bool wifiOk() { return WiFi.status() == WL_CONNECTED; }
-#endif
-
-// WiFi 信号：苹果风 4 个小圆点（填充数=强度）。rightX=最右点中心，cy=中心纵坐标。
-static void drawSignalDots(int rightX, int cy, int rssi, uint8_t color) {
-  int lv = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -75 ? 2 : rssi >= -85 ? 1 : 0;
-  u8g2.setDrawColor(color);
-  for (int i = 0; i < 4; i++) {
-    int cx = rightX - (3 - i) * 5;         // 4 点，中心间距 5px（总宽约 18）
-    if (i < lv) u8g2.drawDisc(cx, cy, 1);        // 实心=有信号
-    else        u8g2.drawCircle(cx, cy, 1);      // 空心=弱
-  }
-  u8g2.setDrawColor(1);
-}
-
 // 响铃声波：从 (x,y) 向右画 n 圈同心弧（动画用）+ 中心点。
 static void drawWaves(int x, int y, int n, uint8_t color) {
   u8g2.setDrawColor(color);
@@ -444,77 +537,339 @@ static void drawWaves(int x, int y, int n, uint8_t color) {
   u8g2.setDrawColor(1);
 }
 
-// 星空：几颗固定星点（避开正中宇航员），部分随相位在「点」和「小十字」间闪烁
-static void drawStars(float ph) {
-  static const uint8_t sx[] = {10, 22, 108, 118, 16, 112, 30, 98};
-  static const uint8_t sy[] = {14, 40, 12, 34, 56, 52, 58, 60};
+// ============================================================================
+//  待机屏模块：屏幕分左右两个 64×64 半屏，各自从模块池任选（见 PANE_NAMES）。
+//  每个模块画在 [x0, x0+64) × [0,64) 内，x0=0 是左半、x0=64 是右半。
+// ============================================================================
+static const int PANE = 64;    // 半屏边长 = 屏高
+
+static const char* WEEK_CN[] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
+
+// 星空：固定星点都落在半屏 64×64 内、避开中央（8..55），部分随相位闪烁成小十字
+static void drawStars(int x0, float ph) {
+  static const uint8_t sx[] = {4, 16, 58, 60, 3, 50, 26, 44};
+  static const uint8_t sy[] = {16, 4, 10, 50, 44, 60, 60, 4};
   int k = (int)ph;
   for (int i = 0; i < 8; i++) {
-    u8g2.drawPixel(sx[i], sy[i]);
+    int x = x0 + sx[i];
+    u8g2.drawPixel(x, sy[i]);
     if ((k + i) % 3 == 0) {                        // 闪烁：变成小十字
-      u8g2.drawPixel(sx[i] - 1, sy[i]); u8g2.drawPixel(sx[i] + 1, sy[i]);
-      u8g2.drawPixel(sx[i], sy[i] - 1); u8g2.drawPixel(sx[i], sy[i] + 1);
+      u8g2.drawPixel(x - 1, sy[i]); u8g2.drawPixel(x + 1, sy[i]);
+      u8g2.drawPixel(x, sy[i] - 1); u8g2.drawPixel(x, sy[i] + 1);
     }
   }
 }
 
-// 程序化小宇航员已改为预渲染的自转帧（astronaut_frames.h + drawXBMP），见 renderIdle。
-
-// 待机屏：星空 + 屏幕正中旋转宇航员 + 右上角苹果风信号点；静音时左上角画 ⊘
-static void renderIdle() {
-  float ph = millis() * 0.0016f;
-  drawStars(ph);
-#ifndef SIM_DEMO
-  drawSignalDots(125, 6, wifiOk() ? WiFi.RSSI() : -100, 1);
-#else
-  drawSignalDots(125, 6, -50, 1);
-#endif
-  if (dnd) { u8g2.drawCircle(6, 7, 4); u8g2.drawLine(3, 4, 9, 10); }   // 左上角静音 ⊘
-  int fi = (int)((millis() / 80) % ASTRO_N);       // 逐帧自转
-  u8g2.drawXBMP((128 - ASTRO_W) / 2, (64 - ASTRO_H) / 2, ASTRO_W, ASTRO_H, ASTRO[fi]);
+// 取本地时间：SNTP 同步前（时钟还停在 1970 附近）返回 false
+static bool clockNow(struct tm& t) {
+  time_t now = time(nullptr);
+  if (now < 1609459200) return false;    // < 2021-01-01 视为未同步
+  t = *localtime(&now);
+  return true;
 }
 
-// 通知屏：反白标题栏（智能体名 + 响铃声波动画）+ 电脑/对话 + 底部时间/未读药丸
+static bool netOnline() {
+#ifndef SIM_DEMO
+  return WiFi.status() == WL_CONNECTED;
+#else
+  return true;
+#endif
+}
+
+// —— 模块 0：宇航员 —— 闪烁星空 + 绕轴自转太空人（预渲染帧，astronaut_frames.h）
+static void paneAstro(int x0) {
+  drawStars(x0, millis() * 0.0016f);
+  int fi = (int)((millis() / 80) % ASTRO_N);       // 逐帧自转
+  u8g2.drawXBMP(x0 + (PANE - ASTRO_W) / 2, (64 - ASTRO_H) / 2, ASTRO_W, ASTRO_H, ASTRO[fi]);
+}
+
+// —— 模块 1：数字时钟 —— 大字 HH:MM + 日期 + 星期（未同步/离线显示状态文字）
+static void paneClock(int x0) {
+  int cx = x0 + PANE / 2;
+  struct tm t;
+  char buf[16];
+  bool has = clockNow(t);
+  if (has) snprintf(buf, sizeof(buf), "%02d:%02d", t.tm_hour, t.tm_min);
+  else     strlcpy(buf, "--:--", sizeof(buf));
+  u8g2.setFont(FONT_CLOCK);
+  u8g2.drawStr(cx - u8g2.getStrWidth(buf) / 2, 30, buf);
+
+  u8g2.setFont(FONT_CN);
+  if (has) {
+    snprintf(buf, sizeof(buf), "%d月%d日", t.tm_mon + 1, t.tm_mday);
+    u8g2.drawUTF8(cx - u8g2.getUTF8Width(buf) / 2, 48, buf);
+    const char* wk = netOnline() ? WEEK_CN[t.tm_wday] : "WiFi断开";   // 断网时占用星期行提示
+    u8g2.drawUTF8(cx - u8g2.getUTF8Width(wk) / 2, 62, wk);
+  } else {
+    const char* s = netOnline() ? "时间同步中" : "WiFi断开";
+    u8g2.drawUTF8(cx - u8g2.getUTF8Width(s) / 2, 50, s);
+  }
+}
+
+// —— 模块 2：模拟表盘 —— 圆形表盘 + 时/分/秒针（未同步时停在 10:08 经典表姿）
+static void paneAnalog(int x0) {
+  int cx = x0 + PANE / 2, cy = 32, r = 30;
+  u8g2.drawCircle(cx, cy, r);
+  for (int i = 0; i < 12; i++) {                    // 12 个刻度：整点长刻度、其余点
+    float a = i * (PI / 6);
+    float s = sinf(a), c = cosf(a);
+    if (i % 3 == 0) u8g2.drawLine(cx + (int)(s * (r - 1)), cy - (int)(c * (r - 1)),
+                                  cx + (int)(s * (r - 5)), cy - (int)(c * (r - 5)));
+    else            u8g2.drawPixel(cx + (int)(s * (r - 3)), cy - (int)(c * (r - 3)));
+  }
+  struct tm t;
+  int hh = 10, mm = 8, ss = 0;                      // 未同步：经典 10:08
+  if (clockNow(t)) { hh = t.tm_hour; mm = t.tm_min; ss = t.tm_sec; }
+  float am = (mm + ss / 60.0f) * (PI / 30);         // 分针角
+  float ah = (hh % 12 + mm / 60.0f) * (PI / 6);     // 时针角
+  float as = ss * (PI / 30);                        // 秒针角
+  u8g2.drawLine(cx, cy, cx + (int)(sinf(ah) * 15), cy - (int)(cosf(ah) * 15));
+  u8g2.drawLine(cx, cy, cx + (int)(sinf(am) * 23), cy - (int)(cosf(am) * 23));
+  u8g2.drawLine(cx, cy, cx + (int)(sinf(as) * 27), cy - (int)(cosf(as) * 27));
+  u8g2.drawDisc(cx, cy, 2);
+}
+
+// —— 模块 3：竖排大钟 —— 上「时」下「分」超大数字，中间冒号点每秒闪烁
+static void paneBigTime(int x0) {
+  int cx = x0 + PANE / 2;
+  struct tm t;
+  char hh[4] = "--", mm[4] = "--";
+  bool has = clockNow(t);
+  if (has) {
+    snprintf(hh, sizeof(hh), "%02d", t.tm_hour);
+    snprintf(mm, sizeof(mm), "%02d", t.tm_min);
+  }
+  u8g2.setFont(FONT_CLOCK_XL);
+  u8g2.drawStr(cx - u8g2.getStrWidth(hh) / 2, 28, hh);
+  u8g2.drawStr(cx - u8g2.getStrWidth(mm) / 2, 62, mm);
+  if (!has || (millis() / 1000) % 2 == 0) {         // 冒号点（横放）：秒闪
+    u8g2.drawBox(cx - 6, 30, 2, 2);
+    u8g2.drawBox(cx + 4, 30, 2, 2);
+  }
+}
+
+// —— 模块 4：日历 —— 反白月份栏 + 超大日期数字 + 星期
+static void paneCalendar(int x0) {
+  struct tm t;
+  bool has = clockNow(t);
+  int cx = x0 + PANE / 2;
+  char buf[16];
+
+  u8g2.drawRBox(x0 + 3, 1, PANE - 6, 15, 2);        // 反白月份栏（日历本头）
+  u8g2.setDrawColor(0);
+  u8g2.drawPixel(x0 + 12, 3); u8g2.drawPixel(x0 + PANE - 13, 3);   // 装订孔（栏内挖黑点）
+  u8g2.setFont(FONT_CN);
+  if (has) snprintf(buf, sizeof(buf), "%d年%d月", t.tm_year + 1900, t.tm_mon + 1);
+  else     strlcpy(buf, "日历", sizeof(buf));
+  u8g2.drawUTF8(cx - u8g2.getUTF8Width(buf) / 2, 13, buf);
+  u8g2.setDrawColor(1);
+
+  if (has) snprintf(buf, sizeof(buf), "%d", t.tm_mday);
+  else     strlcpy(buf, "--", sizeof(buf));
+  u8g2.setFont(FONT_CLOCK_XL);
+  u8g2.drawStr(cx - u8g2.getStrWidth(buf) / 2, 46, buf);
+
+  u8g2.setFont(FONT_CN);
+  const char* wk = has ? WEEK_CN[t.tm_wday] : "--";
+  u8g2.drawUTF8(cx - u8g2.getUTF8Width(wk) / 2, 62, wk);
+}
+
+// —— 模块 5：信息面板 —— 未读 / WiFi 信号 / IP 末段 / 运行时长
+static void paneInfo(int x0) {
+  char l[24];
+  u8g2.setFont(FONT_CN);
+  snprintf(l, sizeof(l), "未读 %d", unread);
+  u8g2.drawUTF8(x0 + 4, 13, l);
+#ifndef SIM_DEMO
+  if (netOnline()) {
+    snprintf(l, sizeof(l), "WiFi %d", (int)WiFi.RSSI());
+    u8g2.drawUTF8(x0 + 4, 29, l);
+    snprintf(l, sizeof(l), "IP .%d", (int)WiFi.localIP()[3]);
+    u8g2.drawUTF8(x0 + 4, 45, l);
+  } else {
+    u8g2.drawUTF8(x0 + 4, 29, "WiFi 断开");
+    u8g2.drawUTF8(x0 + 4, 45, "IP --");
+  }
+#else
+  u8g2.drawUTF8(x0 + 4, 29, "WiFi -60");
+  u8g2.drawUTF8(x0 + 4, 45, "IP .123");
+#endif
+  unsigned long up = millis() / 60000UL;            // 分钟
+  if (up < 60) snprintf(l, sizeof(l), "开机 %lum", up);
+  else         snprintf(l, sizeof(l), "开机 %luh%lum", up / 60, up % 60);
+  u8g2.drawUTF8(x0 + 4, 61, l);
+}
+
+// —— 模块 6：雷达扫描 —— 同心圆 + 十字准线 + 旋转扫描线，扫过目标点时亮起
+static void paneRadar(int x0) {
+  int cx = x0 + PANE / 2, cy = 32;
+  u8g2.drawCircle(cx, cy, 10);
+  u8g2.drawCircle(cx, cy, 20);
+  u8g2.drawCircle(cx, cy, 30);
+  for (int d = 4; d <= 30; d += 5) {                // 十字准线（点线）
+    u8g2.drawPixel(cx + d, cy); u8g2.drawPixel(cx - d, cy);
+    u8g2.drawPixel(cx, cy + d); u8g2.drawPixel(cx, cy - d);
+  }
+  float th = fmodf(millis() * 0.0025f, 2 * PI);     // 扫描角（约 2.5s 一圈）
+  u8g2.drawLine(cx, cy, cx + (int)(cosf(th) * 29), cy + (int)(sinf(th) * 29));
+  for (int k = 1; k <= 3; k++) {                    // 拖影：三条渐稀点线
+    float a = th - k * 0.12f;
+    for (int rr = 6 + k * 3; rr <= 29; rr += 4 + k * 2)
+      u8g2.drawPixel(cx + (int)(cosf(a) * rr), cy + (int)(sinf(a) * rr));
+  }
+  static const int8_t bx[] = {14, -18, 6};          // 三个目标点（相对圆心）
+  static const int8_t by[] = {-9, 7, 21};
+  for (int i = 0; i < 3; i++) {
+    float ba = atan2f((float)by[i], (float)bx[i]);
+    float diff = fmodf(th - ba + 6 * PI, 2 * PI);   // 扫描线刚扫过多久
+    if (diff < 1.2f) u8g2.drawDisc(cx + bx[i], cy + by[i], diff < 0.5f ? 2 : 1);
+    else             u8g2.drawPixel(cx + bx[i], cy + by[i]);
+  }
+}
+
+// —— 模块 7：流星夜空 —— 闪烁星空 + 三颗错峰划过的流星（头亮点 + 斜尾迹）
+static void paneMeteor(int x0) {
+  drawStars(x0, millis() * 0.0016f);
+  static const uint16_t period[] = {2600, 3800, 3100};   // 各自周期错开
+  static const uint16_t offset[] = {0, 1300, 2200};
+  static const uint8_t  startX[] = {58, 44, 60};
+  static const uint8_t  startY[] = {2, 0, 18};
+  for (int i = 0; i < 3; i++) {
+    float ph = ((millis() + offset[i]) % period[i]) / (float)period[i];
+    if (ph > 0.55f) continue;                       // 后半周期休息，别一直满屏流星
+    float tt = ph / 0.55f;
+    int hx = x0 + startX[i] - (int)(tt * 52);       // 向左下划
+    int hy = startY[i] + (int)(tt * 44);
+    if (hx < x0 + 1 || hy > 62) continue;
+    u8g2.drawLine(hx, hy, hx + 7, hy - 6);          // 尾迹（指向来向）
+    u8g2.drawPixel(hx + 10, hy - 8);                // 尾迹末端余烬
+    u8g2.drawDisc(hx, hy, 1);                       // 流星头
+  }
+}
+
+// 待机屏 = 左右两个半屏模块各自渲染（不画分隔线，模块自身留白即边界）
+static void renderIdlePanes() {
+  PANE_FNS[leftStyle](0);
+  PANE_FNS[rightStyle](PANE);
+  if (dnd) { u8g2.drawCircle(6, 7, 4); u8g2.drawLine(3, 4, 9, 10); }   // 全局左上角静音 ⊘
+}
+
+// 通知屏（重设计 2026-08-03）：
+//  ┌──────────────────────────┐ 反白顶栏 18px：智能体名垂直居中（中文名自动换
+//  │▓ Claude        )))  2/5 ▓│ 中文字体），右侧响铃时=声波动画，静止时=位置 k/N
+//  │ [PC] 书房台式             │ 图标行×2：电脑名 / 对话名（超宽省略号截断）
+//  │ [💬] agent-bell           │
+//  │ ·············(点线)······ │
+//  │ 已完成并验证编译…    3m前 │ 消息（截断让位时间）+ 右对齐时间
+//  └──────────────────────────┘
+static const int NBAR_H = 18;    // 顶栏高
+
+// 按像素宽截断 UTF-8 串，放不下时以"..."结尾（调用前须先 setFont）
+static void fitUTF8(const char* s, int maxw, char* out, size_t n) {
+  if ((int)u8g2.getUTF8Width(s) <= maxw) { strlcpy(out, s, n); return; }
+  int ellw = u8g2.getUTF8Width("...");
+  char tmp[120];
+  size_t len = 0, keep = 0;
+  while (s[len] && len < sizeof(tmp) - 5 && len < n - 5) {
+    unsigned char c = (unsigned char)s[len];
+    size_t cl = (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : (c >= 0xC0) ? 2 : 1;
+    memcpy(tmp + len, s + len, cl); tmp[len + cl] = 0;
+    if ((int)u8g2.getUTF8Width(tmp) + ellw > maxw) break;
+    len += cl; keep = len;
+  }
+  memcpy(out, s, keep); strcpy(out + keep, "...");
+}
+
+// 行首小图标（12×10 框内手绘，不引图标字体）：显示器 / 对话气泡
+static void iconPC(int x, int y) {
+  u8g2.drawFrame(x, y, 12, 8);
+  u8g2.drawHLine(x + 3, y + 9, 6);             // 底座
+}
+static void iconChat(int x, int y) {
+  u8g2.drawRFrame(x, y, 12, 8, 2);
+  u8g2.drawPixel(x + 3, y + 8);                // 气泡尾
+  u8g2.drawPixel(x + 2, y + 9);
+}
+
 static void renderNote(const Note* n) {
   char line[112];
   bool ringing = buzzer.busy() || vibrator.busy();
 
-  u8g2.drawBox(0, 0, 128, 16);                        // 反白顶栏
+  // —— 反白顶栏：智能体名（垂直居中，防削顶；中文名回退中文字体）——
+  u8g2.drawBox(0, 0, 128, NBAR_H);
   u8g2.setDrawColor(0);
-  u8g2.setFont(FONT_BIG);
-  u8g2.drawUTF8(3, 13, n->agent[0] ? n->agent : "Agent");
-  int waves = ringing ? (1 + (int)((millis() / 180) % 3)) : 3;   // 报警时 1→2→3 循环
-  drawWaves(116, 8, waves, 0);
+  const char* name = n->agent[0] ? n->agent : "Agent";
+  bool cjk = false;
+  for (const char* p = name; *p; p++) if ((unsigned char)*p >= 0x80) { cjk = true; break; }
+  u8g2.setFont(cjk ? FONT_CN : FONT_BIG);      // FONT_BIG 无中文字模，中文名整段不显示 → 回退
+  u8g2.setFontPosCenter();                     // 以栏中线对齐，任何字体都不越界
+  fitUTF8(name, 92, line, sizeof(line));
+  u8g2.drawUTF8(4, NBAR_H / 2, line);
+  // 顶栏右侧：响铃时声波扩散动画；静止且有多条时显示位置 k/N
+  if (ringing) {
+    int waves = 1 + (int)((millis() / 180) % 3);
+    drawWaves(112, NBAR_H / 2, waves, 0);
+  } else if (ringCount > 1) {
+    u8g2.setFont(FONT_CN);
+    snprintf(line, sizeof(line), "%d/%d", (viewOffset < 0 ? 0 : viewOffset) + 1, ringCount);
+    u8g2.drawUTF8(125 - u8g2.getUTF8Width(line), NBAR_H / 2, line);
+  }
+  u8g2.setFontPosBaseline();
   u8g2.setDrawColor(1);
 
+  // —— 信息两行：图标 + 值（全宽可用，超宽省略）——
   u8g2.setFont(FONT_CN);
-  snprintf(line, sizeof(line), "电脑 %s", n->computer[0] ? n->computer : "-");
-  u8g2.drawUTF8(3, 31, line);                         // 过长由 U8g2 自动裁到屏边
-  snprintf(line, sizeof(line), "对话 %s", n->conversation[0] ? n->conversation : "-");
-  u8g2.drawUTF8(3, 45, line);
+  iconPC(3, 20);
+  fitUTF8(n->computer[0] ? n->computer : "-", 108, line, sizeof(line));
+  u8g2.drawUTF8(19, 30, line);
+  iconChat(3, 34);
+  fitUTF8(n->conversation[0] ? n->conversation : "-", 108, line, sizeof(line));
+  u8g2.drawUTF8(19, 44, line);
 
-  u8g2.drawHLine(0, 50, 128);
+  // —— 点线分隔 + 底行：消息（截断让位时间）+ 右对齐时间 ——
+  for (int x = 0; x < 128; x += 3) u8g2.drawPixel(x, 48);
   char ago[16]; timeAgo(n->recv, ago, sizeof(ago));
-  u8g2.drawUTF8(3, 63, n->message[0] ? n->message : ago);
-  if (unread > 0) {                                   // 右下未读药丸（反白）
-    snprintf(line, sizeof(line), "未读%d", unread);
-    int w = u8g2.getUTF8Width(line);
-    u8g2.drawRBox(126 - w - 6, 52, w + 6, 12, 3);
-    u8g2.setDrawColor(0);
-    u8g2.drawUTF8(126 - w - 3, 62, line);
-    u8g2.setDrawColor(1);
+  int agoW = u8g2.getUTF8Width(ago);
+  u8g2.drawUTF8(126 - agoW, 61, ago);
+  if (n->message[0]) {
+    fitUTF8(n->message, 126 - agoW - 8, line, sizeof(line));
+    u8g2.drawUTF8(3, 61, line);
   }
 }
 
 // ============================================================================
 //  丝滑菜单渲染（缓动光标 + 平滑滚动 + XOR 反白高亮条，借鉴 OLED_UI 观感）
 // ============================================================================
-static const char* MAIN_ITEMS[] = {"提示音", "蜂鸣强度", "震动强度", "操作反馈", "反馈音量", "反馈震动", "旋钮方向", "旋钮灵敏度", "静音", "熄屏", "模拟通知", "设备状态"};
-static const int MAIN_N = sizeof(MAIN_ITEMS) / sizeof(MAIN_ITEMS[0]);
-static const char* mainName(int i) { return MAIN_ITEMS[i]; }
-// 选项子列表（提示音 / 操作反馈 / 旋钮方向 / 旋钮灵敏度）——都用旋钮丝滑选择
+// 主菜单：常用在前，按「勿扰 → 通知一组 → 反馈一组 → 待机屏 → 旋钮 → 电源 → 系统」分组排序。
+// 「通知」=收到消息时的响铃/震动；「反馈」=转动/按下旋钮时的提示音/轻震，两组独立。
+// 勿扰和旋钮方向是开关项：短按直接切换，名字里带当前状态。
+enum MainId { MI_DND, MI_TONE, MI_NVOL, MI_NVIB, MI_FBMODE, MI_FBVOL, MI_FBVIB,
+              MI_LSTYLE, MI_RSTYLE, MI_ENCDIR, MI_ENCSENS,
+              MI_SCREENOFF, MI_POWEROFF, MI_REPROV, MI_SIMNOTE, MI_STATUS, MAIN_N_ };
+static const int MAIN_N = MAIN_N_;
+static const char* mainName(int i) {
+  static char buf[24];
+  switch (i) {
+    case MI_DND:     snprintf(buf, sizeof(buf), "勿扰 · %s", dnd ? "开" : "关"); return buf;
+    case MI_TONE:    return "提示音";
+    case MI_NVOL:    return "通知音量";
+    case MI_NVIB:    return "通知震动";
+    case MI_FBMODE:  return "反馈方式";
+    case MI_FBVOL:   return "反馈音量";
+    case MI_FBVIB:   return "反馈震动";
+    case MI_LSTYLE:  return "左屏样式";
+    case MI_RSTYLE:  return "右屏样式";
+    case MI_ENCDIR:  snprintf(buf, sizeof(buf), "旋钮方向 · %s", encReversed ? "反向" : "正向"); return buf;
+    case MI_ENCSENS: return "旋钮灵敏度";
+    case MI_SCREENOFF: return "熄屏";
+    case MI_POWEROFF:  return "关机";
+    case MI_REPROV:    return "重新配网";
+    case MI_SIMNOTE:   return "模拟通知";
+    default:           return "设备状态";
+  }
+}
+// 选项子列表（提示音 / 反馈方式 / 旋钮灵敏度）——都用旋钮丝滑选择
 static const char* FEEDBACK_OPTS[] = {"声音+震动", "只震动", "只声音", "无"};
-static const char* ENCDIR_OPTS[]   = {"正向", "反向"};
 static const char* ENCSENS_OPTS[]  = {"1 档动一步", "2 档动一步", "3 档动一步"};
 static int subCount() { return (curSub == SUB_MELODY) ? MEL_N : 0; }
 static const char* subName(int i) { return (curSub == SUB_MELODY) ? MELODIES[i].name : ""; }
@@ -557,12 +912,13 @@ static void renderMenu() {
 struct SetMeta { const char* title; bool numeric; const char* const* opts; int nopts; };
 static SetMeta setMeta(SetId id) {
   switch (id) {
-    case SET_BUZVOL: return {"通知蜂鸣", true,  nullptr, 0};
+    case SET_BUZVOL: return {"通知音量", true,  nullptr, 0};
     case SET_VIBVOL: return {"通知震动", true,  nullptr, 0};
     case SET_FBVOL:  return {"反馈音量", true,  nullptr, 0};
     case SET_FBVIB:  return {"反馈震动", true,  nullptr, 0};
-    case SET_FBMODE: return {"操作反馈", false, FEEDBACK_OPTS, 4};
-    case SET_ENCDIR: return {"旋钮方向", false, ENCDIR_OPTS,   2};
+    case SET_FBMODE: return {"反馈方式", false, FEEDBACK_OPTS, 4};
+    case SET_LSTYLE: return {"左屏样式", false, PANE_NAMES, PANE_N};
+    case SET_RSTYLE: return {"右屏样式", false, PANE_NAMES, PANE_N};
     default:         return {"旋钮灵敏度", false, ENCSENS_OPTS, 3};  // SET_ENCSENS
   }
 }
@@ -571,7 +927,8 @@ static int setGet(SetId id) {
     case SET_BUZVOL: return buzzerVol;   case SET_VIBVOL: return vibVol;
     case SET_FBVOL:  return fbVol;       case SET_FBVIB:  return fbVibVol;
     case SET_FBMODE: return feedbackMode;
-    case SET_ENCDIR: return encReversed ? 1 : 0;
+    case SET_LSTYLE: return leftStyle;
+    case SET_RSTYLE: return rightStyle;
     default:         return encDetents - 1;         // SET_ENCSENS
   }
 }
@@ -582,13 +939,40 @@ static void setPut(SetId id, int v) {
     case SET_FBVOL:  fbVol = v; break;
     case SET_FBVIB:  fbVibVol = v; break;
     case SET_FBMODE: feedbackMode = v; break;
-    case SET_ENCDIR: encReversed = (v == 1); break;
+    case SET_LSTYLE: leftStyle = v; break;           // 立即生效 → 选择器背景实时预览
+    case SET_RSTYLE: rightStyle = v; break;
     default:         encDetents = v + 1; break;      // SET_ENCSENS
   }
 }
 
+// 半屏模块选择器：背景就是实时渲染的待机屏（改哪边立即生效，所见即所得），
+// 正在调的半屏套 XOR 高亮框，底部药丸显示模块名 + 序号。
+static void renderPanePicker() {
+  renderIdlePanes();
+  bool left = (curSet == SET_LSTYLE);
+  int x0 = left ? 0 : PANE;
+  int cur = left ? leftStyle : rightStyle;
+
+  u8g2.setDrawColor(2);                             // XOR 双层框：任何模块背景上都可见
+  u8g2.drawFrame(x0, 0, PANE, 64);
+  u8g2.drawFrame(x0 + 1, 1, PANE - 2, 62);
+  u8g2.setDrawColor(1);
+
+  char pill[28];
+  snprintf(pill, sizeof(pill), "%s %d/%d", PANE_NAMES[cur], cur + 1, PANE_N);
+  u8g2.setFont(FONT_CN);
+  int w = u8g2.getUTF8Width(pill) + 10;
+  int px = x0 + (PANE - w) / 2;                     // 药丸贴在所调半屏底部
+  if (px < 0) px = 0; if (px + w > 128) px = 128 - w;
+  u8g2.drawRBox(px, 50, w, 14, 4);
+  u8g2.setDrawColor(0);
+  u8g2.drawUTF8(px + 5, 61, pill);
+  u8g2.setDrawColor(1);
+}
+
 // 丝滑水平滑块：连续值(0-100)填充+thumb；离散值分段吸附点+缓动滑块+当前标签
 static void renderSlider() {
+  if (curSet == SET_LSTYLE || curSet == SET_RSTYLE) { renderPanePicker(); return; }
   SetMeta m = setMeta(curSet);
   int val = setGet(curSet);
   float frac; char big[20];
@@ -639,14 +1023,14 @@ void render() {
     case UI_SLIDER: renderSlider(); break;
     case UI_POPUP:  renderPopup();  break;
     case UI_NOTE: { Note* n = noteByOffset(viewOffset >= 0 ? viewOffset : 0);
-                    if (n) renderNote(n); else renderIdle(); } break;
-    default:        renderIdle();   break;
+                    if (n) renderNote(n); else renderIdlePanes(); } break;
+    default:        renderIdlePanes(); break;
   }
   u8g2.sendBuffer();
 }
 
 // ============================================================================
-//  操作反馈 + 触摸键（触摸键现在只作"返回"，带操作反馈）
+//  操作反馈
 // ============================================================================
 // 操作反馈：按 feedbackMode 给声音/震动，用独立的 fbVol/fbVibVol（与通知音量分开）
 static void opFeedback() {
@@ -654,30 +1038,8 @@ static void opFeedback() {
   if (feedbackMode == 0 || feedbackMode == 2) buzzer.play(TAP_TONES, 1, fbVol);
 }
 
-// 触摸键按一下：给操作反馈 + 置返回标志（各界面语义在 handleInput 处理）
-static void uiTouch() {
-  opFeedback();
-  uiBack = true;
-}
-
-// 触摸键：开机自动判定空闲电平（兼容高/低有效），去抖后每次「按下」触发一次 uiTouch()
-static void handleTouch() {
-  static int stable = -2, lastRaw = -2;
-  static unsigned long tEdge = 0, lastFire = 0;
-  if (touchIdleLevel < 0) touchIdleLevel = digitalRead(TOUCH_PIN);
-  int raw = digitalRead(TOUCH_PIN);
-  if (raw != lastRaw) { tEdge = millis(); lastRaw = raw; }
-  if (raw != stable && millis() - tEdge > TOUCH_DEBOUNCE_MS) {
-    stable = raw;
-    if (raw != touchIdleLevel && millis() - lastFire > 250) {   // 按下沿
-      uiTouch();
-      lastFire = millis();
-    }
-  }
-}
-
 // ============================================================================
-//  编码器 + 触摸 的 UI 输入路由（丝滑菜单状态机）
+//  编码器的 UI 输入路由（丝滑菜单状态机）：短按=进入/确认，长按=返回
 // ============================================================================
 static void enterSub(SubMenu s, int sel) {   // 进入提示音子列表
   curSub = s; subSel = sel;
@@ -694,29 +1056,52 @@ static void enterSlider(SetId id) {          // 进入滑块设置页（thumb �
 static void menuActivate() {
   if (curSub == SUB_MELODY) {                 // 提示音子列表：选用
     alertTone = subSel;
-    buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len, 100);
+    buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len);   // 按通知音量试听（所听即所得）
 #ifndef SIM_DEMO
     saveSettings();
 #endif
     curSub = SUB_NONE;
     return;
   }
-  switch (mainSel) {                           // 主菜单
-    case 0:  enterSub(SUB_MELODY, alertTone); break;   // 提示音
-    case 1:  enterSlider(SET_BUZVOL);  break;          // 蜂鸣强度
-    case 2:  enterSlider(SET_VIBVOL);  break;          // 震动强度
-    case 3:  enterSlider(SET_FBMODE);  break;          // 操作反馈
-    case 4:  enterSlider(SET_FBVOL);   break;          // 反馈音量
-    case 5:  enterSlider(SET_FBVIB);   break;          // 反馈震动
-    case 6:  enterSlider(SET_ENCDIR);  break;          // 旋钮方向
-    case 7:  enterSlider(SET_ENCSENS); break;          // 旋钮灵敏度
-    case 8:  dnd = !dnd;                               // 静音开关
+  switch (mainSel) {                           // 主菜单（枚举分发，顺序见 MainId）
+    case MI_DND:                                       // 勿扰：短按直接切换，行内显示状态
+      dnd = !dnd;
 #ifndef SIM_DEMO
-             saveSettings();
+      saveSettings();
 #endif
-             needRender = true; break;
-    case 9:  setScreen(false); uiState = UI_IDLE; break;   // 熄屏
-    case 10: {                                         // 模拟通知
+      needRender = true; break;
+    case MI_TONE:    enterSub(SUB_MELODY, alertTone); break;
+    case MI_NVOL:    enterSlider(SET_BUZVOL);  break;
+    case MI_NVIB:    enterSlider(SET_VIBVOL);  break;
+    case MI_FBMODE:  enterSlider(SET_FBMODE);  break;
+    case MI_FBVOL:   enterSlider(SET_FBVOL);   break;
+    case MI_FBVIB:   enterSlider(SET_FBVIB);   break;
+    case MI_LSTYLE:  enterSlider(SET_LSTYLE);  break;
+    case MI_RSTYLE:  enterSlider(SET_RSTYLE);  break;
+    case MI_ENCDIR:                                    // 旋钮方向：短按翻转（不进滑块——
+      encReversed = !encReversed;                      // 靠「转」选方向会跟自己打架）
+#ifndef SIM_DEMO
+      saveSettings();
+#endif
+      needRender = true; break;
+    case MI_ENCSENS: enterSlider(SET_ENCSENS); break;
+    case MI_SCREENOFF: setScreen(false); uiState = UI_IDLE; break;
+    case MI_POWEROFF:  powerOff(); break;              // 深睡，转旋钮开机；真机不返回
+    case MI_REPROV:                                    // 重新配网：记一次性标记重启，开机直进热点
+#ifndef SIM_DEMO
+      // 不在运行中切 AP：WebServer 路由无法注销，正常模式的 "/" 会盖住配网页
+      prefs.begin("agentbell", false);
+      prefs.putBool("force_ap", true);
+      prefs.end();
+      u8g2.clearBuffer();
+      u8g2.setFont(FONT_CN);
+      u8g2.drawUTF8(16, 38, "正在进入配网…");
+      u8g2.sendBuffer();
+      delay(400);
+      ESP.restart();                                   // 不返回
+#endif
+      break;
+    case MI_SIMNOTE: {
       Note n{};
       strlcpy(n.computer, "本机测试",   sizeof(n.computer));
       strlcpy(n.agent, "Claude",        sizeof(n.agent));
@@ -725,18 +1110,17 @@ static void menuActivate() {
       n.recv = millis();
       fireAlert(n);
     } break;
-    case 11: uiState = UI_POPUP; break;                // 设备状态
+    case MI_STATUS: uiState = UI_POPUP; break;
   }
 }
 
 static void handleInput() {
   int step = encSteps();
   int btn  = encButton();
-  bool back = uiBack; uiBack = false;
-  if (step == 0 && btn == 0 && !back) return;
+  if (step == 0 && btn == 0) return;
 
   lastInput = millis();
-  if ((step != 0 || btn != 0) && uiState != UI_SLIDER) opFeedback();   // 旋钮转/按反馈（滑块页有自己的即时试声）
+  if (uiState != UI_SLIDER) opFeedback();   // 旋钮转/按反馈（滑块页有自己的即时试声）
   if (screenOff) { setScreen(true); return; }    // 熄屏时任意输入先唤醒
 
   switch (uiState) {
@@ -744,7 +1128,7 @@ static void handleInput() {
       if (step != 0 || btn == 1) { uiState = UI_MENU; curSub = SUB_NONE; mainAnim.sel = mainSel; }
       break;
     case UI_NOTE:
-      if (btn || back) { unread = 0; viewOffset = -1; uiState = UI_IDLE; }
+      if (btn) { unread = 0; viewOffset = -1; uiState = UI_IDLE; }
       else if (step) {
         viewOffset += (step > 0 ? 1 : -1);
         if (viewOffset < 0) viewOffset = 0;
@@ -759,7 +1143,7 @@ static void handleInput() {
         if (curSub == SUB_MELODY) melSettleAt = millis();
       }
       if (btn == 1) menuActivate();
-      if (btn == 2 || back) { if (curSub != SUB_NONE) curSub = SUB_NONE; else uiState = UI_IDLE; }
+      if (btn == 2) { if (curSub != SUB_NONE) curSub = SUB_NONE; else uiState = UI_IDLE; }
     } break;
     case UI_SLIDER: {
       if (step) {
@@ -776,7 +1160,7 @@ static void handleInput() {
           default:         opFeedback();           break;      // 离散项用统一操作反馈
         }
       }
-      if (btn || back) {
+      if (btn) {
 #ifndef SIM_DEMO
         saveSettings();
 #endif
@@ -784,7 +1168,7 @@ static void handleInput() {
       }
     } break;
     case UI_POPUP:
-      if (btn || back || step) uiState = UI_MENU;
+      if (btn || step) uiState = UI_MENU;
       break;
   }
 }
@@ -809,29 +1193,398 @@ static void handleNotify() {   // 唯一保留的写入端点：给电脑侧 hoo
   server.send(200, "text/plain; charset=utf-8", "ok");
 }
 
-// 手机/电脑都能开的控制台
-static void handleRoot() {   // 只读状态页（所有设置已移到设备菜单，用旋钮操作）
-  String h = F("<!doctype html><meta charset=utf-8>"
-    "<meta name=viewport content='width=device-width,initial-scale=1'>"
-    "<title>AgentBell</title><style>"
-    "body{font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:16px;background:#0b1020;color:#e7ecff}"
-    "h1{font-size:20px}.card{background:#161c34;border:1px solid #2a3350;border-radius:12px;padding:14px;margin:12px 0}"
-    ".muted{color:#9aa6cc;font-size:13px}ul{padding-left:18px}li{margin:6px 0}"
-    "</style><h1>🔔 AgentBell</h1>");
-  h += "<div class=card><b>设备状态</b><div class=muted>";
-  h += String("IP ") + WiFi.localIP().toString()
-     + " · 运行 " + String(millis() / 1000) + "s · 信号 " + String(WiFi.RSSI()) + "dBm";
-  h += F("</div><div class=muted style='margin-top:8px'>所有设置请在设备上用旋钮操作。</div></div>");
-  h += "<div class=card><b>最近通知（" + String(ringCount) + "）</b><ul>";
+// ============================================================================
+//  网页设置控制台：静态页存 PROGMEM（不占 RAM），JS 用 fetch 调 /api/settings
+//  读写全部设置。手机/电脑连同一 WiFi 输设备 IP 即可用，与旋钮/桥接改同一份设置。
+//  设计契约（与 tools/agent-bell-bridge 桌面端共享，全项目规范见 DESIGN.md）：
+//  THESIS: 网页端与桌面端是同一台仪器的两块面板（TE OP-1 铝面板语言），拒绝暗色 dashboard 默认
+//  OWN-WORLD: 机身 #E4E3DF + 唯一强调橙 #F04E00 + 全页唯一深色块=OLED 仿真屏 #141412；
+//             推子/拨钮/‹›步进器/键帽按钮 与桌面端 te_widgets 同构
+//  STORY: 用户拧的是设备里同一份设置；改动即时生效并存 flash
+//  FIRST VIEWPORT: 字标+铭牌+状态LED → OLED 仿真屏（视觉锚点）→ 分区控件面板
+//  FORM: Operate——表达不遮蔽任务；对比度≥4.5:1；:focus-visible 橙框；触屏目标≥44px
+//  本地预览：python tools/console-preview/serve.py（mock API，免烧录迭代）
+// ============================================================================
+static const char CONSOLE_HTML[] PROGMEM = R"HTML(<!doctype html><meta charset=utf-8>
+<meta name=viewport content='width=device-width,initial-scale=1'>
+<meta name=color-scheme content=light>
+<title>AgentBell 控制台</title><style>
+:root{--ch:#E4E3DF;--ln:#C6C5C0;--ink:#1D1C19;--mu:#605F58;--acc:#F04E00;--acd:#C84100;
+--key:#F6F5F2;--kdn:#DDDCD7;--ke:#AFAEA8;--db:#141412;--de:#2A2A26;--df:#EDEBE3;--dd:#807E75;
+--mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,'Segoe UI','Microsoft YaHei UI',sans-serif;background:var(--ch);
+color:var(--ink);max-width:480px;margin:0 auto;padding:14px 18px 44px;-webkit-tap-highlight-color:transparent}
+header{display:flex;align-items:center;gap:9px;margin:8px 0 12px}
+h1{font:700 14px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:.34em;margin:0}
+header small{font:12px var(--mono);color:var(--mu)}
+#led{width:9px;height:9px;border-radius:50%;background:#E8A33D;margin-left:auto;flex:none}
+#oled{position:relative;background:var(--db);border:1px solid var(--de);border-radius:8px;
+padding:13px 15px;font-family:var(--mono);overflow:hidden;box-shadow:inset 0 0 22px rgba(0,0,0,.55)}
+#oled .px{color:var(--df);text-shadow:0 0 6px rgba(237,235,227,.35)}
+#oled::after{content:'';position:absolute;inset:0;pointer-events:none;
+background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 3px)}
+#oled .l1{display:flex;justify-content:space-between;font-size:12px;opacity:.85}
+#oled .l2{font-size:21px;font-weight:600;margin:8px 0 2px;min-height:26px}
+#oled .l2 small{font-size:12px;opacity:.7}
+#oled .l3{font-size:12px;opacity:.85}
+.cur{animation:bl 1.1s steps(1) infinite}@keyframes bl{50%{opacity:0}}
+#sweep{position:absolute;left:0;right:0;top:-30%;height:30%;pointer-events:none;
+background:linear-gradient(rgba(237,235,227,0),rgba(237,235,227,.12));animation:sw .9s ease-out 1 forwards}
+@keyframes sw{to{top:110%}}
+#oled.off .px{color:var(--dd);text-shadow:none}
+#oled .wv{position:absolute;right:14px;top:10px;font-size:15px;letter-spacing:2px;opacity:0}
+#oled.ring .wv{animation:rg .5s linear 4}@keyframes rg{0%{opacity:0}40%{opacity:1}100%{opacity:0}}
+section{margin-top:20px}
+h2{font:600 11px/1 var(--mono);letter-spacing:.28em;color:var(--mu);margin:0 0 2px;
+display:flex;align-items:center;gap:8px}
+h2::after{content:'';flex:1;height:1px;background:var(--ln)}
+.it{display:flex;align-items:center;justify-content:space-between;gap:12px;
+min-height:48px;border-bottom:1px solid var(--ln);padding:6px 0}
+.it>span{font-size:15px}
+.mu{color:var(--mu)}small.mu{font-size:12px}
+.sl{display:block;padding:10px 0 4px;border-bottom:1px solid var(--ln)}
+.sl .cap{display:flex;justify-content:space-between;align-items:baseline;font-size:15px}
+.sl output{font:14px var(--mono);color:var(--ink)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:none;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:1px;
+background:linear-gradient(90deg,var(--acc) var(--p,0%),#B3B2AC var(--p,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:24px;margin-top:-11px;
+border-radius:3px;border:1px solid #96958F;box-shadow:0 1px 2px rgba(0,0,0,.25);
+background:var(--key) no-repeat center/13px 10px linear-gradient(90deg,
+transparent 0 3px,#B0AFA9 3px 4px,transparent 4px 6px,#B0AFA9 6px 7px,transparent 7px 9px,#B0AFA9 9px 10px,transparent 10px)}
+input[type=range]::-moz-range-track{height:2px;border-radius:1px;background:#B3B2AC}
+input[type=range]::-moz-range-progress{height:2px;border-radius:1px;background:var(--acc)}
+input[type=range]::-moz-range-thumb{width:13px;height:24px;border-radius:3px;border:1px solid #96958F;
+box-shadow:0 1px 2px rgba(0,0,0,.25);background:var(--key) no-repeat center/13px 10px linear-gradient(90deg,
+transparent 0 3px,#B0AFA9 3px 4px,transparent 4px 6px,#B0AFA9 6px 7px,transparent 7px 9px,#B0AFA9 9px 10px,transparent 10px)}
+.tg{position:relative;width:46px;height:26px;flex:none}
+.tg input{position:absolute;inset:-9px -6px;opacity:0;margin:0;cursor:pointer}
+.tg em{position:absolute;inset:0;border-radius:13px;background-color:#B7B6B0;transition:background-color .15s}
+.tg em::before{content:'';position:absolute;top:2px;left:3px;width:20px;height:20px;border-radius:50%;
+background:#FFF;border:1px solid #9C9B95;transition:transform .15s}
+.tg input:checked+em{background-color:var(--acc)}
+.tg input:checked+em::before{transform:translateX(19px);border-color:var(--acd)}
+select{-webkit-appearance:none;appearance:none;min-width:132px;max-width:56%;min-height:44px;
+padding:9px 30px 9px 12px;font:13px var(--mono);color:var(--ink);border:1px solid #C9C8C2;
+border-radius:5px;box-shadow:inset 0 1px 3px rgba(0,0,0,.12);background:#ECEBE7
+url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23605F58' stroke-width='1.5'/%3E%3C/svg%3E")
+no-repeat right 11px center}
+button.k{font-size:14px;padding:12px 16px;border-radius:6px;border:1px solid var(--ke);
+background:var(--key);color:var(--ink);cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+button.k:active{background:var(--kdn);transform:translateY(1px);box-shadow:none}
+button.pri{background:var(--acd);border-color:#B23A00;color:#FFF;font-weight:600}
+button.pri:active{background:#B23A00}
+.btns{display:flex;gap:10px;padding:12px 0}
+ul{list-style:none;margin:0;padding:0}
+ul li{border-bottom:1px solid var(--ln);padding:10px 0;font-size:14px}
+ul li:last-child{border-bottom:0}
+ul b{font-weight:600}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--db);
+border:1px solid var(--de);color:var(--df);font:13px var(--mono);padding:9px 18px;border-radius:8px;
+opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<header><h1>AGENTBELL</h1><small>console-1</small><i id=led></i></header>
+<div id=oled>
+ <div id=sweep></div><span class="wv px">)))</span>
+ <div class="l1 px"><span id=st>连接中</span><span id=ip></span></div>
+ <div class="l2 px" id=big>待机中<span class=cur>▮</span></div>
+ <div class="l3 px" id=sub>&nbsp;</div>
+</div>
+<section><h2>NOTIFY · 通知</h2>
+ <div class=it><span>提示音</span><select id=tone aria-label=提示音></select></div>
+ <div class=btns><button class=k onclick="act('play')">试听</button><button class=k onclick="act('vibtest')">试震</button></div>
+ <div class=sl><div class=cap><span>通知音量</span><output id=obvol></output></div><input type=range id=bvol min=0 max=100 step=5 aria-label=通知音量></div>
+ <div class=sl><div class=cap><span>通知震动</span><output id=ovvol></output></div><input type=range id=vvol min=0 max=100 step=5 aria-label=通知震动></div>
+ <div class=it><span>蜂鸣器</span><label class=tg><input type=checkbox id=buzz><em></em></label></div>
+ <div class=it><span>震动</span><label class=tg><input type=checkbox id=vib><em></em></label></div>
+ <div class=it><span>勿扰 <small class=mu>只屏显不响</small></span><label class=tg><input type=checkbox id=dnd><em></em></label></div>
+ <div class=it><span>通知亮屏 <small class=mu>熄屏自动点亮</small></span><label class=tg><input type=checkbox id=nwake><em></em></label></div>
+</section>
+<section><h2>FEEDBACK · 操作反馈</h2>
+ <div class=it><span>反馈方式</span><select id=fb aria-label=反馈方式></select></div>
+ <div class=sl><div class=cap><span>反馈音量</span><output id=ofbvol></output></div><input type=range id=fbvol min=0 max=100 step=5 aria-label=反馈音量></div>
+ <div class=sl><div class=cap><span>反馈震动</span><output id=ofbvib></output></div><input type=range id=fbvib min=0 max=100 step=5 aria-label=反馈震动></div>
+</section>
+<section><h2>SCREEN · 屏幕</h2>
+ <div class=it><span>待机屏·左</span><select id=lsty aria-label=待机屏左></select></div>
+ <div class=it><span>待机屏·右</span><select id=rsty aria-label=待机屏右></select></div>
+</section>
+<section><h2>ENCODER · 旋钮</h2>
+ <div class=it><span>方向反转</span><label class=tg><input type=checkbox id=encrev><em></em></label></div>
+ <div class=it><span>灵敏度</span><select id=encdet aria-label=灵敏度></select></div>
+</section>
+<section><h2>LOG · 最近通知</h2>
+ <ul id=notes><li class=mu>加载中……</li></ul>
+ <div class=btns><button class="k pri" onclick="test()">发测试通知</button></div>
+</section>
+<div id=toast></div>
+<script>
+const $=id=>document.getElementById(id);
+let S=null,busy=0,fails=0;
+const FB=['声音+震动','只震动','只声音','无'],DET=['1 档/步','2 档/步','3 档/步'];
+function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;
+ clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,1300)}
+function setSl(k,v){const r=$(k);r.value=v;r.style.setProperty('--p',v+'%');$('o'+k).value=v}
+function fill(sel,names,cur,base){sel.innerHTML='';(names||[]).forEach((n,i)=>{
+ const o=document.createElement('option');o.value=(base||0)+i;o.textContent=n;sel.appendChild(o)});
+ sel.value=cur}
+function render(s){S=s;
+ ['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).checked=!!s[k]);
+ ['bvol','vvol','fbvol','fbvib'].forEach(k=>setSl(k,s[k]));
+ fill($('tone'),s.melodies,s.tone);fill($('fb'),FB,s.fb);fill($('encdet'),DET,s.encdet,1);
+ fill($('lsty'),s.panes,s.lsty);fill($('rsty'),s.panes,s.rsty)}
+function save(f){busy=1;
+ fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+  body:new URLSearchParams(f)}).then(r=>r.json()).then(s=>{render(s);toast('已保存')})
+ .catch(()=>toast('保存失败，请重试')).finally(()=>busy=0)}
+function act(k){save({[k]:1});ring()}
+function test(){fetch('/api/test').then(()=>{toast('已发送');ring()}).catch(()=>toast('发送失败'))}
+function ring(){const o=$('oled');o.classList.remove('ring');void o.offsetWidth;o.classList.add('ring')}
+['tone','fb','encdet','lsty','rsty'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
+['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).checked?1:0}));
+['bvol','vvol','fbvol','fbvib'].forEach(k=>{const r=$(k);
+ r.oninput=()=>{r.style.setProperty('--p',r.value+'%');$('o'+k).value=r.value};
+ r.onchange=()=>save({[k]:r.value})});
+function esc(s){const d=document.createElement('i');d.textContent=s;return d.innerHTML}
+function fmt(s){return s<3600?Math.floor(s/60)+'分':Math.floor(s/3600)+'时'+Math.floor(s%3600/60)+'分'}
+function refresh(){if(busy)return;
+ fetch('/api/info').then(r=>r.json()).then(i=>{fails=0;$('oled').classList.remove('off');
+  $('st').textContent='在线';$('st').style.color='#3FB950';$('led').style.background='#3FB950';
+  $('ip').textContent=i.ip;$('sub').textContent='信号 '+i.rssi+'dBm · 运行 '+fmt(i.uptime_s)})
+ .catch(()=>{if(++fails>1){$('oled').classList.add('off');$('st').textContent='连接断开';
+  $('st').style.color='#E5484D';$('led').style.background='#E5484D';$('sub').textContent='正在重试……'}});
+ fetch('/api/notes').then(r=>r.json()).then(a=>{
+  $('big').innerHTML=a.length?esc(a[0].agent)+' <small>'+esc(a[0].conversation)+'</small>'
+                             :'待机中<span class=cur>▮</span>';
+  const u=$('notes');u.innerHTML='';
+  if(!a.length){u.innerHTML='<li class=mu>还没有通知。点下方按钮试一条。</li>';return}
+  a.forEach(n=>{const li=document.createElement('li');
+   li.innerHTML='<b></b> · <span></span> · <span></span> <span class=mu></span>';
+   const e=li.querySelectorAll('b,span');e[0].textContent=n.agent;e[1].textContent=n.computer;
+   e[2].textContent=n.conversation;e[3].textContent='('+n.ago+')';u.appendChild(li)})}).catch(()=>0)}
+fetch('/api/settings').then(r=>r.json()).then(render);refresh();setInterval(refresh,5000);
+</script>)HTML";
+
+static void handleRoot() {
+  server.send_P(200, "text/html; charset=utf-8", CONSOLE_HTML);
+}
+
+// 最近通知 → JSON 数组（控制台用；文本来自电脑侧，需转义防注入/防坏 JSON）
+static void jsonEscapeTo(String& out, const char* s) {
+  for (const char* p = s; *p; p++) {
+    unsigned char c = (unsigned char)*p;
+    if (c == '"' || c == '\\') { out += '\\'; out += (char)c; }
+    else if (c < 0x20) { char b[8]; snprintf(b, sizeof(b), "\\u%04x", c); out += b; }
+    else out += (char)c;
+  }
+}
+static void handleApiNotes() {
+  String j;
+  j.reserve(256 + ringCount * 200);
+  j += "[";
   for (int k = 0; k < ringCount; k++) {
     Note* n = noteByOffset(k);
     char ago[16]; timeAgo(n->recv, ago, sizeof(ago));
-    h += "<li><b>" + String(n->agent) + "</b> · " + String(n->computer)
-       + " · " + String(n->conversation) + " <span class=muted>(" + String(ago) + ")</span></li>";
+    if (k) j += ",";
+    j += "{\"agent\":\"";        jsonEscapeTo(j, n->agent);
+    j += "\",\"computer\":\"";   jsonEscapeTo(j, n->computer);
+    j += "\",\"conversation\":\""; jsonEscapeTo(j, n->conversation);
+    j += "\",\"message\":\"";    jsonEscapeTo(j, n->message);
+    j += "\",\"ago\":\"";        j += ago;
+    j += "\"}";
   }
-  if (ringCount == 0) h += F("<li class=muted>暂无</li>");
-  h += F("</ul></div>");
+  j += "]";
+  server.send(200, "application/json; charset=utf-8", j);
+}
+
+// ============================================================================
+//  桥接 API（给电脑侧桥接程序用，JSON 用 String 拼接，不引 ArduinoJson）
+// ============================================================================
+// 设备身份：局域网扫描时靠它确认「这是 AgentBell」
+static void handleApiInfo() {
+  String j = "{\"app\":\"agent-bell\",\"api\":1";
+  j += ",\"name\":\"" + String(MDNS_NAME) + "\"";
+  j += ",\"mac\":\"" + WiFi.macAddress() + "\"";
+  j += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
+  j += ",\"rssi\":" + String(WiFi.RSSI());
+  j += ",\"uptime_s\":" + String(millis() / 1000);
+  j += "}";
+  server.send(200, "application/json; charset=utf-8", j);
+}
+
+// 当前全部运行时设置 → JSON（GET 与 POST 应答共用）
+static String settingsJson() {
+  String j;
+  j.reserve(512);            // 一次预分配，避免几十次 += 反复扩容
+  j += "{";
+  j += "\"buzz\":"   + String(buzzerEnabled ? 1 : 0);
+  j += ",\"vib\":"   + String(vibEnabled ? 1 : 0);
+  j += ",\"dnd\":"   + String(dnd ? 1 : 0);
+  j += ",\"bvol\":"  + String(buzzerVol);
+  j += ",\"vvol\":"  + String(vibVol);
+  j += ",\"tone\":"  + String(alertTone);
+  j += ",\"fb\":"    + String(feedbackMode);
+  j += ",\"fbvol\":" + String(fbVol);
+  j += ",\"fbvib\":" + String(fbVibVol);
+  j += ",\"encrev\":" + String(encReversed ? 1 : 0);
+  j += ",\"encdet\":" + String(encDetents);
+  j += ",\"nwake\":" + String(notifyWakes ? 1 : 0);
+  j += ",\"lsty\":"  + String(leftStyle);
+  j += ",\"rsty\":"  + String(rightStyle);
+  j += ",\"melodies\":[";
+  for (int i = 0; i < MEL_N; i++) {           // 固定常量名，无需 JSON 转义
+    if (i) j += ",";
+    j += "\"" + String(MELODIES[i].name) + "\"";
+  }
+  j += "],\"panes\":[";
+  for (int i = 0; i < PANE_N; i++) {          // 待机屏半屏模块名（左右通用）
+    if (i) j += ",";
+    j += "\"" + String(PANE_NAMES[i]) + "\"";
+  }
+  j += "]}";
+  return j;
+}
+
+// 表单参数工具：有该字段才改（全部可选，只改传了的）
+static bool argBool(const char* key, bool cur) {
+  return server.hasArg(key) ? (server.arg(key).toInt() != 0) : cur;
+}
+static int argClamp(const char* key, int cur, int lo, int hi) {
+  if (!server.hasArg(key)) return cur;
+  int v = server.arg(key).toInt();
+  if (v < lo) v = lo; if (v > hi) v = hi;
+  return v;
+}
+
+// GET 读设置；POST 改设置（字段全部可选）+ 可选动作 play/vibtest
+static void handleApiSettings() {
+  if (server.method() == HTTP_POST) {
+    buzzerEnabled = argBool("buzz",   buzzerEnabled);
+    vibEnabled    = argBool("vib",    vibEnabled);
+    dnd           = argBool("dnd",    dnd);
+    encReversed   = argBool("encrev", encReversed);
+    notifyWakes   = argBool("nwake",  notifyWakes);
+    buzzerVol     = argClamp("bvol",   buzzerVol,    0, 100);
+    vibVol        = argClamp("vvol",   vibVol,       0, 100);
+    fbVol         = argClamp("fbvol",  fbVol,        0, 100);
+    fbVibVol      = argClamp("fbvib",  fbVibVol,     0, 100);
+    alertTone     = argClamp("tone",   alertTone,    0, MEL_N - 1);
+    feedbackMode  = argClamp("fb",     feedbackMode, 0, 3);
+    encDetents    = argClamp("encdet", encDetents,   1, 3);
+    leftStyle     = argClamp("lsty",   leftStyle,    0, PANE_N - 1);
+    rightStyle    = argClamp("rsty",   rightStyle,   0, PANE_N - 1);
+    buzzer.setVolume(buzzerVol);              // 同步到输出通道
+    vibrator.setVolume(vibVol);
+    saveSettings();                           // 存 NVS 掉电不丢
+    needRender = true;                        // 刷新屏幕（如静音图标）
+    // 动作参数（设置改完再执行）：试听/试震是用户显式操作，不受 dnd/开关限制；
+    // 音量用刚生效的设置值 → 听到的就是之后通知的实际响度
+    if (server.hasArg("play") && server.arg("play").toInt() != 0)
+      buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len);
+    if (server.hasArg("vibtest") && server.arg("vibtest").toInt() != 0)
+      vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]));
+  }
+  server.send(200, "application/json; charset=utf-8", settingsJson());
+}
+
+// 链路自检：注入一条固定测试通知，完整走 fireAlert（响铃+震动+屏显）
+static void handleApiTest() {
+  Note n{};
+  strlcpy(n.computer,     "桥接程序", sizeof(n.computer));
+  strlcpy(n.agent,        "测试",     sizeof(n.agent));
+  strlcpy(n.conversation, "链路自检", sizeof(n.conversation));
+  strlcpy(n.message,      "看到这条说明电脑到设备链路正常", sizeof(n.message));
+  n.recv = millis();
+  fireAlert(n);
+  server.send(200, "text/plain; charset=utf-8", "ok");
+}
+
+// ============================================================================
+//  AP 配网模式：连不上 WiFi（或菜单选「重新配网」）时开热点 AgentBell-XXXX。
+//  手机/电脑连它 → 强制门户弹配置页（或访问 192.168.4.1）→ 填 WiFi → 设备重启去连。
+//  电脑侧 tools/agent-bell-bridge/provision.py 可全自动完成这套流程。
+// ============================================================================
+static const char* AP_PASS = "agentbell";   // 热点密码（8 位起；页面和 OLED 都会显示）
+
+// 配网页（内存页面，无外部资源；手机弱信号也秒开）
+static void handlePortalRoot() {
+  String h;
+  h.reserve(1800);
+  h += F("<!doctype html><meta charset=utf-8>"
+    "<meta name=viewport content='width=device-width,initial-scale=1'>"
+    "<title>AgentBell 配网</title><style>"
+    "body{font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;padding:20px;background:#0b1020;color:#e7ecff}"
+    "h1{font-size:22px}input,button{width:100%;box-sizing:border-box;font-size:16px;padding:10px;margin:6px 0;"
+    "border-radius:8px;border:1px solid #2a3350}input{background:#161c34;color:#e7ecff}"
+    "button{background:#3b82f6;color:#fff;border:none;font-weight:600}"
+    ".muted{color:#9aa6cc;font-size:13px}</style>"
+    "<h1>🔔 AgentBell 配网</h1>"
+    "<p class=muted>把设备接入你的 WiFi（仅支持 2.4GHz）。提交后设备自动重启并连接。</p>"
+    "<form method=POST action=/wifi>"
+    "<input name=ssid placeholder='WiFi 名称 (SSID)' required maxlength=32>"
+    "<input name=pass type=password placeholder='WiFi 密码（开放网络留空）' maxlength=64>"
+    "<button>保存并连接</button></form>");
+  h += "<p class=muted>设备 MAC：" + WiFi.macAddress() + "</p>";
   server.send(200, "text/html; charset=utf-8", h);
+}
+
+// 保存凭据并重启（表单和 provision.py 共用；GET/POST 都收）
+static void handlePortalWifi() {
+  String ssid = server.arg("ssid");
+  String pass = server.arg("pass");
+  ssid.trim();
+  if (!ssid.length()) { server.send(400, "text/plain; charset=utf-8", "ssid required"); return; }
+  saveWifiCred(ssid.c_str(), pass.c_str());
+  server.send(200, "text/html; charset=utf-8",
+      F("<!doctype html><meta charset=utf-8><body style='font-family:system-ui;background:#0b1020;color:#e7ecff;"
+        "text-align:center;padding-top:60px'><h2>✅ 已保存</h2><p>设备正在重启并连接新 WiFi……<br>"
+        "连上后 OLED 会回到待机屏。</p>"));
+  u8g2.clearBuffer();
+  u8g2.setFont(FONT_CN);
+  u8g2.drawUTF8(10, 30, "收到新WiFi配置");
+  u8g2.drawUTF8(10, 50, "正在重启连接…");
+  u8g2.sendBuffer();
+  delay(600);                                // 等应答发完
+  ESP.restart();
+}
+
+// 进入配网模式（不返回正常流程；10 分钟无人配则重启重试原 WiFi）
+static void enterApMode() {
+  apMode = true;
+  apStartedAt = millis();
+  uint8_t mac[6]; WiFi.macAddress(mac);
+  snprintf(apSsid, sizeof(apSsid), "AgentBell-%02X%02X", mac[4], mac[5]);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSsid, AP_PASS);              // 192.168.4.1
+  dnsServer.start(53, "*", WiFi.softAPIP()); // 强制门户：任意域名 → 设备
+  server.on("/wifi", handlePortalWifi);      // 配网接口（provision.py 用）
+  server.on("/api/info", handleApiInfo);     // 身份确认（provision.py 扫描判定用）
+  server.onNotFound(handlePortalRoot);       // 其余一律回配置页（含 /generate_204 等探测）
+  server.begin();
+  Serial.printf("[ap] 配网热点 %s 密码 %s，配置页 http://192.168.4.1\n", apSsid, AP_PASS);
+}
+
+// 配网模式的 OLED 屏（loop 里代替正常渲染）
+static void renderApScreen() {
+  u8g2.clearBuffer();
+  u8g2.setFont(FONT_CN);
+  u8g2.drawUTF8(0, 12, "WiFi 配网模式");
+  u8g2.drawHLine(0, 15, 128);
+  char l[40];
+  snprintf(l, sizeof(l), "热点:%s", apSsid);
+  u8g2.drawUTF8(0, 27, l);
+  snprintf(l, sizeof(l), "密码:%s", AP_PASS);
+  u8g2.drawUTF8(0, 39, l);
+  u8g2.drawUTF8(0, 51, "连热点后浏览器打开:");           // 12px/汉字，一行放不下 IP，拆两行
+  int n = WiFi.softAPgetStationNum();
+  if (n > 0) snprintf(l, sizeof(l), "192.168.4.1 · 已连%d台", n);
+  else       strlcpy(l, "192.168.4.1", sizeof(l));
+  u8g2.drawUTF8(0, 63, l);
+  u8g2.sendBuffer();
 }
 #endif
 
@@ -840,11 +1593,16 @@ static void handleRoot() {   // 只读状态页（所有设置已移到设备菜
 //   agent / computer / conversation / message  —— 设了 agent 就显示一条通知
 //   buzzer / vib / dnd  (0|1)                   —— 状态指示（关铃/关震/勿扰）
 //   unread N / history N                        —— 未读数 / 待机屏历史条数
+//   lsty N / rsty N                             —— 待机屏左/右半屏模块索引
 // 不设 agent → 显示待机屏。
 static void simRefresh() {
   buzzerEnabled = SIM_NUM("buzzer", 1) != 0;
   vibEnabled    = SIM_NUM("vib", 1) != 0;
   dnd           = SIM_NUM("dnd", 0) != 0;
+  leftStyle     = (int)SIM_NUM("lsty", 0);
+  rightStyle    = (int)SIM_NUM("rsty", 1);
+  if (leftStyle  < 0 || leftStyle  >= PANE_N) leftStyle  = 0;
+  if (rightStyle < 0 || rightStyle >= PANE_N) rightStyle = 1;
   const char* ag = SIM_STR("agent", "");
   if (ag[0]) {
     strlcpy(ring[0].agent,        ag,                           sizeof(ring[0].agent));
@@ -869,9 +1627,14 @@ static void simRefresh() {
 // ============================================================================
 void setup() {
   Serial.begin(115200);
+#if !defined(SIM_DEMO) && !defined(INO_SIM)
+  // 若是从「关机」深睡醒来：先解除引脚锁定，否则蜂鸣/震动脚被 hold 住无法驱动
+  gpio_hold_dis((gpio_num_t)BUZZER_PIN);
+  gpio_hold_dis((gpio_num_t)VIB_PIN);
+  gpio_deep_sleep_hold_dis();
+#endif
   buzzer.begin(BUZZER_PIN);
   vibrator.begin(VIB_PIN, VIB_ACTIVE_HIGH, VIB_FREQ);
-  pinMode(TOUCH_PIN, INPUT);
 
   Wire.begin(OLED_SDA, OLED_SCL);
   u8g2.setI2CAddress(OLED_ADDR << 1);
@@ -883,12 +1646,25 @@ void setup() {
 
 #ifndef SIM_DEMO
   loadSettings();                            // 读回上次保存的开关状态
+  loadWifiCred();                            // WiFi 凭据：NVS（配网写的）优先，其次 secrets.h
 
-  // —— 连 WiFi（OLED 显进度）——
+  // 菜单「重新配网」重启进来：吃掉一次性标记，直进热点（不试连原 WiFi）
+  prefs.begin("agentbell", false);
+  bool forceAp = prefs.getBool("force_ap", false);
+  if (forceAp) prefs.putBool("force_ap", false);
+  prefs.end();
+  if (forceAp) {
+    enterApMode();
+    needRender = true;
+    return;
+  }
+
+  // —— 连 WiFi（OLED 显进度，最多等 20s；连不上自动进配网热点）——
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);               // 关闭 WiFi 省电休眠 → 通知即时响应（USB 供电，不在乎功耗）
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) {
+  WiFi.setAutoReconnect(true);        // 路由器重启/信号闪断后由内核自动重连
+  WiFi.begin(wifiSsid, wifiPass);
+  for (int i = 0; i < 80 && WiFi.status() != WL_CONNECTED; i++) {
     u8g2.clearBuffer();
     u8g2.setFont(FONT_CN);
     u8g2.drawUTF8(0, 24, "正在连接 WiFi");
@@ -897,23 +1673,33 @@ void setup() {
     u8g2.sendBuffer();
     delay(250);
   }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("WiFi OK: %s\n", WiFi.localIP().toString().c_str());
-    if (MDNS.begin(MDNS_NAME)) MDNS.addService("http", "tcp", 80);
-    // 开放（供 hook / 探活，无需登录）
-    server.on("/notify",  handleNotify);      // 给电脑侧 hook 用（GET/POST 均可）
-    server.on("/healthz", []() { server.send(200, "text/plain", "ok"); });
-    server.on("/",        handleRoot);        // 只读状态页（设置全在设备菜单）
-    server.onNotFound([]() { server.send(404, "text/plain", "not found"); });
-    server.begin();
-  } else {
-    Serial.println("WiFi 连接失败，稍后可复位重试");
+  if (WiFi.status() != WL_CONNECTED) {       // 20s 没连上：多半在陌生环境 → 开配网热点
+    Serial.printf("WiFi「%s」连不上，进入配网模式\n", wifiSsid);
+    enterApMode();
+    needRender = true;
+    return;                                  // 配网模式由 loop 顶部接管，不走下面的正常初始化
   }
+  // 待机屏时钟：SNTP 后台同步（非阻塞，掉线重连后也会补同步）。中国时区 UTC+8。
+  configTime(8 * 3600, 0, "ntp.aliyun.com", "pool.ntp.org");
+
+  // HTTP 服务不依赖连网时序：开机时路由器还没好（如停电恢复）也照常启动，连上 WiFi 即可用。
+  // mDNS 要拿到 IP 才有意义，放在 loop 里首次连上后挂载。
+  server.on("/notify",  handleNotify);      // 给电脑侧 hook 用（GET/POST 均可）
+  server.on("/healthz", []() { server.send(200, "text/plain", "ok"); });
+  server.on("/",        handleRoot);        // 网页设置控制台（读写 /api/settings）
+  server.on("/api/info",     handleApiInfo);      // 设备身份 JSON（桥接程序扫描确认用）
+  server.on("/api/settings", handleApiSettings);  // 读/改运行时设置（GET 读，POST 改）
+  server.on("/api/notes",    handleApiNotes);     // 最近通知 JSON（控制台用）
+  server.on("/api/test",     handleApiTest);      // 注入固定测试通知，验证链路
+  server.onNotFound([]() { server.send(404, "text/plain", "not found"); });
+  server.begin();
+  if (WiFi.status() != WL_CONNECTED) Serial.println("WiFi 尚未连上，后台继续重连…");
 #else
   // —— 仿真预览（Wokwi）：注入两条示例通知，直接看界面 ——
   // ino-sim 走 scenario 注入（见 simRefresh），故这里跳过硬编码 demo。
   #ifndef INO_SIM
+  struct timeval tv = { 1785406080, 0 };   // 假时间 2026-07-30 10:08（预览时钟面板用）
+  settimeofday(&tv, nullptr);
   Note a{}; strlcpy(a.computer, "书房台式", sizeof(a.computer));
   strlcpy(a.agent, "Codex", sizeof(a.agent));
   strlcpy(a.conversation, "后端重构", sizeof(a.conversation));
@@ -934,23 +1720,47 @@ void loop() {
   simRefresh();                 // ino-sim：每帧同步 scenario 注入的界面状态
 #endif
 #ifndef SIM_DEMO
+  if (apMode) {                 // —— 配网模式：只跑门户 + 屏显，不跑正常 UI ——
+    dnsServer.processNextRequest();
+    server.handleClient();
+    static unsigned long lastApDraw = 0;
+    if (millis() - lastApDraw > 500) { lastApDraw = millis(); renderApScreen(); }
+    if (millis() - apStartedAt > 10 * 60 * 1000UL) ESP.restart();   // 10min 没人配 → 重启再试原 WiFi
+    delay(2);
+    return;
+  }
   server.handleClient();
+  // 首次连上 WiFi 后挂载 mDNS（开机没连上时每 2s 补查一次；掉线重连无需重挂）
+  static bool mdnsUp = false;
+  static unsigned long lastNetChk = 0;
+  if (!mdnsUp && millis() - lastNetChk > 2000) {
+    lastNetChk = millis();
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("WiFi OK: %s\n", WiFi.localIP().toString().c_str());
+      if (MDNS.begin(MDNS_NAME)) MDNS.addService("http", "tcp", 80);
+      mdnsUp = true;
+    }
+  }
 #endif
   buzzer.update();
   vibrator.update();
-  handleTouch();
   handleInput();
 
-  // 提示音子菜单：停留 ~300ms 自动试听
+  // 提示音子菜单：停留 ~300ms 自动试听（按通知音量，所听即所得）
   if (uiState == UI_MENU && curSub == SUB_MELODY && subSel != melPreviewed && millis() - melSettleAt > 300) {
     melPreviewed = subSel;
-    buzzer.play(MELODIES[subSel].seq, MELODIES[subSel].len, 100);
+    buzzer.play(MELODIES[subSel].seq, MELODIES[subSel].len);
   }
-  // 菜单/调节/弹窗闲置 15s 回待机
-  if (uiState != UI_IDLE && uiState != UI_NOTE && millis() - lastInput > 15000) uiState = UI_IDLE;
+  // 菜单/调节/弹窗闲置 15s 回待机（滑块页超时退出也把已改的值存盘）
+  if (uiState != UI_IDLE && uiState != UI_NOTE && millis() - lastInput > 15000) {
+#ifndef SIM_DEMO
+    if (uiState == UI_SLIDER) saveSettings();
+#endif
+    uiState = UI_IDLE;
+  }
 
-  // 菜单动画期高刷（~45fps）；待机/通知 ~100ms（熄屏时 render 直接返回）
-  unsigned long interval = (uiState == UI_MENU || uiState == UI_SLIDER || uiState == UI_POPUP) ? 22 : 100;
+  // 菜单动画期高刷（~45fps）；待机/通知 40ms（宇航员 80ms/帧，采样需更密才不跳帧；熄屏时 render 直接返回）
+  unsigned long interval = (uiState == UI_MENU || uiState == UI_SLIDER || uiState == UI_POPUP) ? 22 : 40;
   if (needRender || millis() - lastRender > interval) {
     render();
     needRender = false;

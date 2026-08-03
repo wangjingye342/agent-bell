@@ -1,0 +1,160 @@
+{
+ "connections": [
+  {
+   "pin": "R4:1",
+   "kind": "net_port_in",
+   "net": "BUZZER_CTRL"
+  },
+  {
+   "pin": "U1:12",
+   "kind": "net_port_in",
+   "net": "BUZZER_CTRL"
+  },
+  {
+   "pin": "R1:1",
+   "kind": "net_port_in",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "SW1:A",
+   "kind": "net_port_in",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "U1:10",
+   "kind": "net_port_in",
+   "net": "ENC_CLK"
+  },
+  {
+   "pin": "R2:1",
+   "kind": "net_port_in",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "SW1:B",
+   "kind": "net_port_in",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "U1:3",
+   "kind": "net_port_in",
+   "net": "ENC_DT"
+  },
+  {
+   "pin": "R3:1",
+   "kind": "net_port_in",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "SW1:D",
+   "kind": "net_port_in",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "U1:7",
+   "kind": "net_port_in",
+   "net": "ENC_SW"
+  },
+  {
+   "pin": "J4:1",
+   "kind": "net_port_in",
+   "net": "GPIO0"
+  },
+  {
+   "pin": "U1:9",
+   "kind": "net_port_in",
+   "net": "GPIO0"
+  },
+  {
+   "pin": "J4:2",
+   "kind": "net_port_in",
+   "net": "GPIO2"
+  },
+  {
+   "pin": "U1:11",
+   "kind": "net_port_in",
+   "net": "GPIO2"
+  },
+  {
+   "pin": "J4:3",
+   "kind": "net_port_in",
+   "net": "GPIO21"
+  },
+  {
+   "pin": "U1:8",
+   "kind": "net_port_in",
+   "net": "GPIO21"
+  },
+  {
+   "pin": "J1:3",
+   "kind": "net_port_in",
+   "net": "OLED_SCL"
+  },
+  {
+   "pin": "U1:2",
+   "kind": "net_port_in",
+   "net": "OLED_SCL"
+  },
+  {
+   "pin": "J1:4",
+   "kind": "net_port_in",
+   "net": "OLED_SDA"
+  },
+  {
+   "pin": "U1:1",
+   "kind": "net_port_in",
+   "net": "OLED_SDA"
+  },
+  {
+   "pin": "J2:1",
+   "kind": "net_port_in",
+   "net": "TOUCH_SIG"
+  },
+  {
+   "pin": "U1:13",
+   "kind": "net_port_in",
+   "net": "TOUCH_SIG"
+  },
+  {
+   "pin": "R6:1",
+   "kind": "net_port_in",
+   "net": "VIB_CTRL"
+  },
+  {
+   "pin": "U1:6",
+   "kind": "net_port_in",
+   "net": "VIB_CTRL"
+  },
+  {
+   "pin": "C4:1",
+   "kind": "net_port_in",
+   "net": "VIB_M"
+  },
+  {
+   "pin": "D1:2",
+   "kind": "net_port_in",
+   "net": "VIB_M"
+  },
+  {
+   "pin": "J3:2",
+   "kind": "net_port_in",
+   "net": "VIB_M"
+  },
+  {
+   "pin": "Q2:3",
+   "kind": "net_port_in",
+   "net": "VIB_M"
+  }
+ ],
+ "rules": {
+  "avoidTitleBlock": true,
+  "avoidPinFanout": true,
+  "staggerLabels": true,
+  "offsetRange": [
+   50,
+   100
+  ],
+  "offsetStep": 10,
+  "minLabelGap": 16
+ }
+}

@@ -1,0 +1,6 @@
+{"connections":[
+ {"pin":"Q2:3","kind":"net_port_bi","net":"VIB_M"},
+ {"pin":"D1:2","kind":"net_port_bi","net":"VIB_M"},
+ {"pin":"C4:1","kind":"net_port_bi","net":"VIB_M"},
+ {"pin":"J3:2","kind":"net_port_bi","net":"VIB_M"}
+],"rules":{"avoidTitleBlock":true,"avoidPinFanout":true,"staggerLabels":true,"offsetRange":[18,80],"offsetStep":6,"minLabelGap":14}}

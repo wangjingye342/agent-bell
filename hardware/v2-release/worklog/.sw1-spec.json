@@ -1,0 +1,9 @@
+{"connections":[
+ {"pin":"SW1:A","kind":"net_port_in","net":"ENC_CLK"},
+ {"pin":"SW1:B","kind":"net_port_in","net":"ENC_DT"},
+ {"pin":"SW1:D","kind":"net_port_in","net":"ENC_SW"},
+ {"pin":"SW1:C","kind":"gnd","net":"GND"},
+ {"pin":"SW1:E","kind":"gnd","net":"GND"},
+ {"pin":"SW1:6","kind":"gnd","net":"GND"},
+ {"pin":"SW1:7","kind":"gnd","net":"GND"}
+],"rules":{"avoidTitleBlock":true,"avoidPinFanout":true,"staggerLabels":true,"offsetRange":[30,80],"offsetStep":10,"minLabelGap":14}}

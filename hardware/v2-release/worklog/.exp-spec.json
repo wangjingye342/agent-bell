@@ -1,0 +1,4 @@
+{"connections":[
+ {"pin":"U1:13","kind":"net_port_out","net":"TOUCH_SIG"},
+ {"pin":"J2:1","kind":"net_port_in","net":"TOUCH_SIG"}
+],"rules":{"staggerLabels":true,"offsetRange":[18,80],"offsetStep":6}}

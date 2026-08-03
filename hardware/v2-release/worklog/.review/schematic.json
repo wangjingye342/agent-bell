@@ -1,0 +1,692 @@
+{
+ "nets": {
+  "3V3": [
+   "U1.14",
+   "C1.2",
+   "J1.2",
+   "C2.2",
+   "C4.2",
+   "J2.2",
+   "R1.2",
+   "R2.2",
+   "R3.2",
+   "R5.1",
+   "Q1.2",
+   "J3.1",
+   "D1.1",
+   "C3.2"
+  ],
+  "5V": [
+   "U1.16",
+   "D2.1",
+   "U2.4",
+   "LED1.1"
+  ],
+  "BUZZER_CTRL": [
+   "U1.12",
+   "R4.1"
+  ],
+  "BZ_B": [
+   "R5.2",
+   "Q1.1",
+   "R4.2"
+  ],
+  "BZ_DRV": [
+   "Q1.3",
+   "LS1.1"
+  ],
+  "CHG_LED": [
+   "R9.1",
+   "LED1.2"
+  ],
+  "CHG_PROG": [
+   "U2.5",
+   "R8.2"
+  ],
+  "CHG_STAT": [
+   "R9.2",
+   "U2.1"
+  ],
+  "ENC_CLK": [
+   "U1.10",
+   "R1.1",
+   "SW1.1"
+  ],
+  "ENC_DT": [
+   "U1.3",
+   "R2.1",
+   "SW1.3"
+  ],
+  "ENC_SW": [
+   "U1.7",
+   "R3.1",
+   "SW1.5"
+  ],
+  "GND": [
+   "U1.15",
+   "C1.1",
+   "J1.1",
+   "C2.1",
+   "J2.3",
+   "R7.2",
+   "J5.2",
+   "Q2.2",
+   "C3.1",
+   "C5.1",
+   "LS1.2",
+   "SW1.2",
+   "SW1.4",
+   "SW1.6",
+   "SW1.7",
+   "U2.2",
+   "R8.1"
+  ],
+  "GPIO0": [
+   "U1.9",
+   "J4.1"
+  ],
+  "GPIO2": [
+   "U1.11",
+   "J4.2"
+  ],
+  "GPIO21": [
+   "U1.8",
+   "J4.3"
+  ],
+  "OLED_SCL": [
+   "U1.2",
+   "J1.3"
+  ],
+  "OLED_SDA": [
+   "U1.1",
+   "J1.4"
+  ],
+  "TOUCH_SIG": [
+   "U1.13",
+   "J2.1"
+  ],
+  "VBAT": [
+   "J5.1",
+   "D2.2",
+   "C5.2",
+   "U2.3"
+  ],
+  "VIB_CTRL": [
+   "U1.6",
+   "R6.1"
+  ],
+  "VIB_G": [
+   "R7.1",
+   "Q2.1",
+   "R6.2"
+  ],
+  "VIB_M": [
+   "C4.1",
+   "J3.2",
+   "Q2.3",
+   "D1.2"
+  ]
+ },
+ "components": {
+  "U1": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "GPIO5",
+     "net": "OLED_SDA"
+    },
+    {
+     "n": "2",
+     "name": "GPIO6",
+     "net": "OLED_SCL"
+    },
+    {
+     "n": "3",
+     "name": "GPIO7",
+     "net": "ENC_DT"
+    },
+    {
+     "n": "4",
+     "name": "GPIO8",
+     "net": null
+    },
+    {
+     "n": "5",
+     "name": "GPIO9",
+     "net": null
+    },
+    {
+     "n": "6",
+     "name": "GPIO10",
+     "net": "VIB_CTRL"
+    },
+    {
+     "n": "7",
+     "name": "GPIO20",
+     "net": "ENC_SW"
+    },
+    {
+     "n": "8",
+     "name": "GPIO21",
+     "net": "GPIO21"
+    },
+    {
+     "n": "9",
+     "name": "GPIO0",
+     "net": "GPIO0"
+    },
+    {
+     "n": "10",
+     "name": "GPIO1",
+     "net": "ENC_CLK"
+    },
+    {
+     "n": "11",
+     "name": "GPIO2",
+     "net": "GPIO2"
+    },
+    {
+     "n": "12",
+     "name": "GPIO3",
+     "net": "BUZZER_CTRL"
+    },
+    {
+     "n": "13",
+     "name": "GPIO4",
+     "net": "TOUCH_SIG"
+    },
+    {
+     "n": "14",
+     "name": "3V3",
+     "net": "3V3"
+    },
+    {
+     "n": "15",
+     "name": "GND",
+     "net": "GND"
+    },
+    {
+     "n": "16",
+     "name": "5V",
+     "net": "5V"
+    }
+   ]
+  },
+  "C1": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    }
+   ]
+  },
+  "J1": {
+   "name": "焊线孔x4-OLED",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    },
+    {
+     "n": "3",
+     "name": "3",
+     "net": "OLED_SCL"
+    },
+    {
+     "n": "4",
+     "name": "4",
+     "net": "OLED_SDA"
+    }
+   ]
+  },
+  "C2": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    }
+   ]
+  },
+  "C4": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "VIB_M"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    }
+   ]
+  },
+  "J2": {
+   "name": "焊线孔x3-触摸",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "TOUCH_SIG"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    },
+    {
+     "n": "3",
+     "name": "3",
+     "net": "GND"
+    }
+   ]
+  },
+  "J4": {
+   "name": "焊线孔x3-扩展IO",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GPIO0"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "GPIO2"
+    },
+    {
+     "n": "3",
+     "name": "3",
+     "net": "GPIO21"
+    }
+   ]
+  },
+  "R1": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "ENC_CLK"
+    }
+   ]
+  },
+  "R2": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "ENC_DT"
+    }
+   ]
+  },
+  "R3": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "ENC_SW"
+    }
+   ]
+  },
+  "R5": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "BZ_B"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "3V3"
+    }
+   ]
+  },
+  "R7": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "GND"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "VIB_G"
+    }
+   ]
+  },
+  "Q1": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "B",
+     "net": "BZ_B"
+    },
+    {
+     "n": "2",
+     "name": "E",
+     "net": "3V3"
+    },
+    {
+     "n": "3",
+     "name": "C",
+     "net": "BZ_DRV"
+    }
+   ]
+  },
+  "R4": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "BZ_B"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "BUZZER_CTRL"
+    }
+   ]
+  },
+  "R9": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "CHG_STAT"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "CHG_LED"
+    }
+   ]
+  },
+  "J3": {
+   "name": "焊线孔x2-马达",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "3V3"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "VIB_M"
+    }
+   ]
+  },
+  "J5": {
+   "name": "焊线孔x2-电池",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "VBAT"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "GND"
+    }
+   ]
+  },
+  "Q2": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "3",
+     "name": "D",
+     "net": "VIB_M"
+    },
+    {
+     "n": "1",
+     "name": "G",
+     "net": "VIB_G"
+    },
+    {
+     "n": "2",
+     "name": "S",
+     "net": "GND"
+    }
+   ]
+  },
+  "R6": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "VIB_G"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "VIB_CTRL"
+    }
+   ]
+  },
+  "D1": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "A",
+     "net": "VIB_M"
+    },
+    {
+     "n": "1",
+     "name": "K",
+     "net": "3V3"
+    }
+   ]
+  },
+  "D2": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "A",
+     "net": "VBAT"
+    },
+    {
+     "n": "1",
+     "name": "K",
+     "net": "5V"
+    }
+   ]
+  },
+  "C3": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "3V3"
+    }
+   ]
+  },
+  "C5": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "VBAT"
+    }
+   ]
+  },
+  "LS1": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "1",
+     "net": "BZ_DRV"
+    },
+    {
+     "n": "2",
+     "name": "2",
+     "net": "GND"
+    }
+   ]
+  },
+  "SW1": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "A",
+     "net": "ENC_CLK"
+    },
+    {
+     "n": "2",
+     "name": "C",
+     "net": "GND"
+    },
+    {
+     "n": "3",
+     "name": "B",
+     "net": "ENC_DT"
+    },
+    {
+     "n": "4",
+     "name": "E",
+     "net": "GND"
+    },
+    {
+     "n": "5",
+     "name": "D",
+     "net": "ENC_SW"
+    },
+    {
+     "n": "6",
+     "name": "EP",
+     "net": "GND"
+    },
+    {
+     "n": "7",
+     "name": "EP",
+     "net": "GND"
+    }
+   ]
+  },
+  "U2": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "1",
+     "name": "CHRG#",
+     "net": "CHG_STAT"
+    },
+    {
+     "n": "2",
+     "name": "GND",
+     "net": "GND"
+    },
+    {
+     "n": "3",
+     "name": "BAT",
+     "net": "VBAT"
+    },
+    {
+     "n": "4",
+     "name": "VCC",
+     "net": "5V"
+    },
+    {
+     "n": "5",
+     "name": "PROG",
+     "net": "CHG_PROG"
+    }
+   ]
+  },
+  "R8": {
+   "name": "={Value}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "2",
+     "net": "CHG_PROG"
+    },
+    {
+     "n": "1",
+     "name": "1",
+     "net": "GND"
+    }
+   ]
+  },
+  "LED1": {
+   "name": "={Manufacturer Part}",
+   "pins": [
+    {
+     "n": "2",
+     "name": "-",
+     "net": "CHG_LED"
+    },
+    {
+     "n": "1",
+     "name": "+",
+     "net": "5V"
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,20 @@
+{
+  "page": "P1",
+  "sheet": "A4",
+  "modules": [
+    {"name": "MCU", "zone": "center", "core": "U1", "parts": ["U1", "C1"]},
+    {"name": "OLED_CONN", "zone": "left-top", "core": "J1", "parts": ["J1", "C2"]},
+    {"name": "TOUCH_CONN", "zone": "left-bottom", "core": "J2", "parts": ["J2"]},
+    {"name": "EXPANSION", "zone": "left-bottom", "core": "J4", "parts": ["J4"]},
+    {"name": "ENCODER", "zone": "right-top", "core": "SW1", "parts": ["SW1", "R1", "R2", "R3"]},
+    {"name": "BUZZER_DRV", "zone": "right", "core": "LS1", "parts": ["LS1", "Q1", "R4", "R5"]},
+    {"name": "VIB_DRV", "zone": "center-bottom", "core": "Q2", "parts": ["Q2", "J3", "R6", "R7", "D1", "C4", "C3"]}
+  ],
+  "rules": {
+    "avoidTitleBlock": true,
+    "preservePinFanout": true,
+    "moduleGap": 80,
+    "routeChannelGap": 40,
+    "preferVerticalPeripheralPlacement": true
+  }
+}
