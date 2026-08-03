@@ -31,11 +31,6 @@ jobs:
         run: >
           python -m PyInstaller pack/AgentBellBridge.spec --noconfirm
           --distpath pack/dist --workpath pack/build
-      - name: 给 Inno 补中文语言包
-        shell: pwsh
-        run: |
-          $dst = "C:\Program Files (x86)\Inno Setup 6\Languages\ChineseSimplified.isl"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile $dst
       - name: Inno Setup 出安装器
         shell: pwsh
         run: |
@@ -47,16 +42,9 @@ jobs:
           if-no-files-found: error
 
   macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-14          # Apple 芯片（M 系列）
-            tag: applesilicon
-          - runner: macos-13          # Intel（跑道若被 GitHub 下线不影响其它任务）
-            tag: intel
-    runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.tag == 'intel' }}
+    # Apple 芯片版。Intel 老 Mac 用不了云跑道（macos-13 已退役），
+    # 需要时在 Intel Mac 上本地跑 pack/build_mac.sh intel。
+    runs-on: macos-14
     defaults:
       run:
         working-directory: tools/agent-bell-bridge
@@ -66,9 +54,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: 构建 .app + DMG
-        run: bash pack/build_mac.sh ${{ matrix.tag }}
+        run: bash pack/build_mac.sh applesilicon
       - uses: actions/upload-artifact@v4
         with:
-          name: AgentBellBridge-mac-${{ matrix.tag }}
+          name: AgentBellBridge-mac-applesilicon
           path: tools/agent-bell-bridge/pack/Output/*.dmg
           if-no-files-found: error

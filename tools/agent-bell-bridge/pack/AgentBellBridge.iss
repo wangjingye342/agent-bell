@@ -25,7 +25,8 @@ WizardStyle=modern
 ShowLanguageDialog=no
 
 [Languages]
-Name: "chs"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 语言文件随仓库带（pack/ChineseSimplified.isl），不依赖 Inno 安装了中文语言包
+Name: "chs"; MessagesFile: "ChineseSimplified.isl"
 
 [Tasks]
 Name: "autostart"; Description: "开机自动启动（推荐，装完就不用管了）"
