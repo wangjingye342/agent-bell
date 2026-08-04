@@ -1,6 +1,7 @@
 # arduino-cli 编译产物（本地重生成）
 agent_bell/build/
 agent_bell/build-sim/
+agent_bell/build-diag/
 tools/board_selftest/build/
 
 # Python 字节码
@@ -18,6 +19,7 @@ agent_bell/secrets.h
 # EDA 工具会话缓存 / 抓取的元器件数据（本地重生成）
 .codex/
 .easyeda/
+.tmp-*/
 
 # EDA 工程快照备份 / 一次性调试中间产物（本地留档即可）
 hardware/backup/

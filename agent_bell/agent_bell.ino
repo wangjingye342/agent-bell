@@ -41,7 +41,7 @@ struct Note;
 struct ListAnim;
 struct SetMeta;
 enum SubMenu { SUB_NONE, SUB_MELODY };                          // 选项子列表（当前仅提示音用竖列表）
-enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE };  // 滑块设置项（定义在顶部，供自动原型引用）
+enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE, SET_AUTOOFF, SET_AUTOPWR };  // 滑块设置项（定义在顶部，供自动原型引用）
 
 // ===== 硬件引脚（ESP32-C3 SuperMini，全部避开 strapping 脚 2/8/9）=====
 #define OLED_SDA   5      // I2C 数据
@@ -148,12 +148,17 @@ class Pulser {
   void trigger(const uint16_t* pat, uint8_t len, int volOverride = -1) {
     ovDuty_ = (volOverride >= 0) ? (uint32_t)volOverride * 256 / 100 : duty_;   // 可临时指定音量(0-100)
     pat_ = pat; len_ = len; idx_ = 0;
-    on_ = true; active_ = true; tMark_ = millis(); drive();
+    budget_ = 0;                                  // 保险：整段节奏的总时长（+余量）
+    for (uint8_t i = 0; i < len; i++) budget_ += pat[i];
+    budget_ += 400;
+    on_ = true; active_ = true; tMark_ = tStart_ = millis(); drive();
   }
   void stop() { active_ = false; on_ = false; drive(); }
   bool busy() const { return active_; }
   void update() {
     if (!active_) return;
+    // 保险：主循环若被别的任务（如 WiFi 重连）饿到，超时强制静默，绝不长震
+    if (millis() - tStart_ > budget_) { stop(); return; }
     if (millis() - tMark_ >= pat_[idx_]) {
       idx_++;
       if (idx_ >= len_) { stop(); return; }      // 节奏走完
@@ -172,7 +177,7 @@ class Pulser {
   }
   uint8_t pin_ = 0; bool activeHigh_ = true; uint32_t duty_ = 255, ovDuty_ = 255;
   const uint16_t* pat_ = nullptr; uint8_t len_ = 0, idx_ = 0;
-  bool on_ = false, active_ = false; unsigned long tMark_ = 0;
+  bool on_ = false, active_ = false; unsigned long tMark_ = 0, tStart_ = 0, budget_ = 0;
 };
 
 // ============================================================================
@@ -194,13 +199,18 @@ class ToneBuzzer {
   void play(const ToneSeg* seq, uint8_t n, int volOverride = -1) {
     seq_ = seq; n_ = n; i_ = 0; active_ = true; lastFreq_ = -1;
     ovVol_ = (volOverride >= 0) ? volOverride : vol_;
-    tSeg_ = millis(); applyCur();
+    budget_ = 0;                                 // 保险：整段音序总时长（+余量）
+    for (uint8_t k = 0; k < n; k++) budget_ += seq[k].ms;
+    budget_ += 400;
+    tSeg_ = tStart_ = millis(); applyCur();
   }
   void stop() { active_ = false; idleSilent(); }
   bool busy() const { return active_; }
   void update() {
     if (!active_) return;
     unsigned long now = millis();
+    // 保险：主循环被饿到（WiFi 重连抢 CPU 等）时超时强制静音，绝不长鸣
+    if (now - tStart_ > budget_) { stop(); return; }
     if (now - tSeg_ >= seq_[i_].ms) {           // 本段结束 → 下一段
       if (++i_ >= n_) { stop(); return; }
       tSeg_ = now; applyCur(); return;
@@ -229,7 +239,7 @@ class ToneBuzzer {
   }
   uint8_t pin_ = 0; const ToneSeg* seq_ = nullptr; uint8_t n_ = 0, i_ = 0;
   bool active_ = false; int vol_ = 100, ovVol_ = 100, lastFreq_ = -1;
-  unsigned long tSeg_ = 0, tFreq_ = 0;
+  unsigned long tSeg_ = 0, tFreq_ = 0, tStart_ = 0, budget_ = 0;
 };
 
 Pulser vibrator;
@@ -340,6 +350,19 @@ int  fbVol         = 60;      // 操作反馈·音量（与通知分开；够明
 int  fbVibVol      = 75;      // 操作反馈·震动强度（与通知分开；需高于马达启动阈值）
 int  leftStyle     = 0;       // 待机屏左半模块索引（对应 PANE_NAMES）
 int  rightStyle    = 1;       // 待机屏右半模块索引
+// —— 省电：闲置多久自动熄屏 / 自动关机（0=不启用）。计时基准见 lastActivity() ——
+int  autoOffMin    = 0;       // 无通知且无操作 N 分钟后熄屏（0=关闭）
+int  autoPwrMin    = 0;       // 无通知且无操作 N 分钟后关机（0=关闭）
+static const int AUTOOFF_MIN_OPTS[] = {0, 1, 2, 5, 10, 20, 30};        // 熄屏可选分钟
+static const int AUTOPWR_MIN_OPTS[] = {0, 10, 20, 30, 60, 120, 240};   // 关机可选分钟
+static const char* AUTOOFF_OPTS[] = {"关闭", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "20 分钟", "30 分钟"};
+static const char* AUTOPWR_OPTS[] = {"关闭", "10 分钟", "20 分钟", "30 分钟", "1 小时", "2 小时", "4 小时"};
+static const int AUTO_OPT_N = 7;
+// 分钟值 → 选项下标（存的是分钟数，菜单/网页按下标选）
+static int autoIdx(const int* tbl, int minutes) {
+  for (int i = 0; i < AUTO_OPT_N; i++) if (tbl[i] == minutes) return i;
+  return 0;
+}
 // ===== 待机屏半屏模块池（左右两半都是 64×64，同一池子里任选，菜单/API/桥接共用）=====
 // 模块渲染函数在下方"待机屏模块"一节定义；这里先声明，供函数指针表引用。
 static void paneAstro(int x0);     static void paneClock(int x0);
@@ -353,12 +376,15 @@ bool screenOff   = false;         // 屏幕是否熄灭（运行时，不持久�
 bool notifyWakes = true;          // 熄屏时来通知是否自动亮屏
 
 // ===== UI 状态机（编码器导航的丝滑菜单）=====
-enum UiState { UI_IDLE, UI_NOTE, UI_MENU, UI_SLIDER, UI_POPUP };
+enum UiState { UI_IDLE, UI_NOTE, UI_MENU, UI_SLIDER, UI_POPUP, UI_WIFI };
 UiState uiState = UI_IDLE;
 SubMenu curSub = SUB_NONE;        // 主菜单里进入的"选项子列表"（当前仅提示音）
 SetId curSet = SET_BUZVOL;        // 当前正在调的滑块设置项
 int   mainSel = 0, subSel = 0;    // 主列表 / 子列表当前选中项
 unsigned long lastInput = 0;      // 最近交互（15s 回待机）
+unsigned long lastNoteAt = 0;     // 最近收到通知的时刻（自动熄屏/关机计时用）
+// 自动熄屏/关机的计时基准：通知与操作取较晚者——正在转旋钮时绝不会突然黑屏或关机
+static unsigned long lastActivity() { return lastNoteAt > lastInput ? lastNoteAt : lastInput; }
 unsigned long melSettleAt = 0;    // 提示音停留自动试听计时
 int   melPreviewed = -1;
 struct ListAnim { float top, sel; };
@@ -375,6 +401,27 @@ bool apMode = false;              // 当前是否在配网热点模式
 char apSsid[20] = "";             // AgentBell-XXXX（XXXX=MAC 尾两字节）
 unsigned long apStartedAt = 0;    // 配网模式起始时刻（无人配网 10min 自动重启重试）
 DNSServer dnsServer;              // 强制门户：所有域名都解析到设备自己
+
+// ============================================================================
+//  WiFi 掉线自愈（自管重连，不靠内核 autoReconnect）—— 实现见下方 wifiTick()
+// ----------------------------------------------------------------------------
+//  为什么自己管：ESP32-C3 是单核，WiFi 驱动的持续重连扫描优先级高于 Arduino 主
+//  循环，掉线后会把 loop 饿到几百毫秒都跑不了一轮 —— 表现就是旋钮失灵、蜂鸣器
+//  卡在发声段变成间歇长鸣。改成「安静等待 + 定时试一次」，CPU 大部分时间归 UI。
+// ============================================================================
+static const unsigned long WIFI_RETRY_MS    = 15000;  // 掉线后重试间隔起点
+static const unsigned long WIFI_BACKOFF_MAX = 60000;  // 退避上限
+bool wifiWasUp = false;             // 上一轮是否在线（检测掉线/恢复边沿）
+bool serverUp = false;              // server.begin() 是否已调用过（服务一直监听，不随掉线开关）
+unsigned long wifiNextTry = 0;      // 下次重连时刻
+unsigned long wifiRetryGap = WIFI_RETRY_MS;
+unsigned long wifiLostAt = 0;       // 掉线时刻（状态页显示已断多久）
+int  wifiTries = 0;                 // 掉线后已试连次数（状态页显示）
+
+static void wifiKick() {            // 菜单/状态页里手动「立刻重连」
+  wifiNextTry = 0;
+  wifiRetryGap = WIFI_RETRY_MS;
+}
 
 static void loadWifiCred() {
   prefs.begin("agentbell", true);
@@ -414,6 +461,8 @@ static void loadSettings() {
   notifyWakes   = prefs.getBool("nwake", true);   // 熄屏时来通知是否自动亮屏
   leftStyle     = prefs.getInt("lsty", 0);   if (leftStyle < 0 || leftStyle >= PANE_N) leftStyle = 0;
   rightStyle    = prefs.getInt("rsty", 1);   if (rightStyle < 0 || rightStyle >= PANE_N) rightStyle = 1;
+  autoOffMin    = prefs.getInt("aoff", 0);   if (autoIdx(AUTOOFF_MIN_OPTS, autoOffMin) == 0) autoOffMin = 0;   // 非法值归零=关闭
+  autoPwrMin    = prefs.getInt("apwr", 0);   if (autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin) == 0) autoPwrMin = 0;
   prefs.end();
   buzzer.setVolume(buzzerVol);
   vibrator.setVolume(vibVol);
@@ -434,6 +483,8 @@ static void saveSettings() {
   prefs.putBool("nwake", notifyWakes);
   prefs.putInt("lsty", leftStyle);
   prefs.putInt("rsty", rightStyle);
+  prefs.putInt("aoff", autoOffMin);
+  prefs.putInt("apwr", autoPwrMin);
   prefs.end();
 }
 #endif
@@ -507,6 +558,7 @@ void fireAlert(const Note& n) {
   if (uiState == UI_SLIDER) saveSettings();       // 通知顶掉滑块/样式选择页前，先把已改的值存盘
 #endif
   addNote(n);
+  lastNoteAt = millis();                          // 自动熄屏/关机的计时重新起算
   uiState = UI_NOTE;                              // 通知打断任何界面
   // 不传音量覆盖 → 用 setVolume 同步进来的「蜂鸣强度/震动强度」设置值
   if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len);
@@ -845,7 +897,8 @@ static void renderNote(const Note* n) {
 // 勿扰和旋钮方向是开关项：短按直接切换，名字里带当前状态。
 enum MainId { MI_DND, MI_TONE, MI_NVOL, MI_NVIB, MI_FBMODE, MI_FBVOL, MI_FBVIB,
               MI_LSTYLE, MI_RSTYLE, MI_ENCDIR, MI_ENCSENS,
-              MI_SCREENOFF, MI_POWEROFF, MI_REPROV, MI_SIMNOTE, MI_STATUS, MAIN_N_ };
+              MI_AUTOOFF, MI_AUTOPWR, MI_SCREENOFF, MI_POWEROFF,
+              MI_WIFI, MI_REPROV, MI_SIMNOTE, MI_STATUS, MAIN_N_ };
 static const int MAIN_N = MAIN_N_;
 static const char* mainName(int i) {
   static char buf[24];
@@ -861,8 +914,11 @@ static const char* mainName(int i) {
     case MI_RSTYLE:  return "右屏样式";
     case MI_ENCDIR:  snprintf(buf, sizeof(buf), "旋钮方向 · %s", encReversed ? "反向" : "正向"); return buf;
     case MI_ENCSENS: return "旋钮灵敏度";
-    case MI_SCREENOFF: return "熄屏";
-    case MI_POWEROFF:  return "关机";
+    case MI_AUTOOFF: return "自动熄屏";
+    case MI_AUTOPWR: return "自动关机";
+    case MI_SCREENOFF: return "立即熄屏";
+    case MI_POWEROFF:  return "立即关机";
+    case MI_WIFI:      return "WiFi 状态";
     case MI_REPROV:    return "重新配网";
     case MI_SIMNOTE:   return "模拟通知";
     default:           return "设备状态";
@@ -919,6 +975,8 @@ static SetMeta setMeta(SetId id) {
     case SET_FBMODE: return {"反馈方式", false, FEEDBACK_OPTS, 4};
     case SET_LSTYLE: return {"左屏样式", false, PANE_NAMES, PANE_N};
     case SET_RSTYLE: return {"右屏样式", false, PANE_NAMES, PANE_N};
+    case SET_AUTOOFF: return {"自动熄屏", false, AUTOOFF_OPTS, AUTO_OPT_N};
+    case SET_AUTOPWR: return {"自动关机", false, AUTOPWR_OPTS, AUTO_OPT_N};
     default:         return {"旋钮灵敏度", false, ENCSENS_OPTS, 3};  // SET_ENCSENS
   }
 }
@@ -929,6 +987,8 @@ static int setGet(SetId id) {
     case SET_FBMODE: return feedbackMode;
     case SET_LSTYLE: return leftStyle;
     case SET_RSTYLE: return rightStyle;
+    case SET_AUTOOFF: return autoIdx(AUTOOFF_MIN_OPTS, autoOffMin);
+    case SET_AUTOPWR: return autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin);
     default:         return encDetents - 1;         // SET_ENCSENS
   }
 }
@@ -941,6 +1001,8 @@ static void setPut(SetId id, int v) {
     case SET_FBMODE: feedbackMode = v; break;
     case SET_LSTYLE: leftStyle = v; break;           // 立即生效 → 选择器背景实时预览
     case SET_RSTYLE: rightStyle = v; break;
+    case SET_AUTOOFF: autoOffMin = AUTOOFF_MIN_OPTS[v]; break;
+    case SET_AUTOPWR: autoPwrMin = AUTOPWR_MIN_OPTS[v]; break;
     default:         encDetents = v + 1; break;      // SET_ENCSENS
   }
 }
@@ -1002,6 +1064,33 @@ static void renderSlider() {
   u8g2.drawDisc(kx, ty + th / 2, 4);
 }
 
+// WiFi 状态页：在线看 SSID/IP/信号；离线看已断多久、第几次重试、下次重试倒计时。
+// 短按 = 立刻重连一次；长按 = 返回菜单。掉线时这页也照常响应旋钮（重连不再抢 CPU）。
+static void renderWifi() {
+  u8g2.drawBox(0, 0, 128, 15); u8g2.setDrawColor(0);
+  u8g2.setFont(FONT_CN); u8g2.drawUTF8(3, 12, "WiFi 状态"); u8g2.setDrawColor(1);
+  char l[48];
+#ifndef SIM_DEMO
+  if (WiFi.status() == WL_CONNECTED) {
+    snprintf(l, sizeof(l), "已连 %s", wifiSsid);      u8g2.drawUTF8(3, 28, l);
+    snprintf(l, sizeof(l), "IP %s", WiFi.localIP().toString().c_str()); u8g2.drawUTF8(3, 41, l);
+    snprintf(l, sizeof(l), "信号 %d dBm", (int)WiFi.RSSI());            u8g2.drawUTF8(3, 54, l);
+    u8g2.drawUTF8(3, 64, "短按=重连");
+  } else {
+    unsigned long lost = (millis() - wifiLostAt) / 1000UL;
+    snprintf(l, sizeof(l), "未连接 · 已断 %lus", lost);  u8g2.drawUTF8(3, 28, l);
+    snprintf(l, sizeof(l), "目标 %s", wifiSsid);        u8g2.drawUTF8(3, 41, l);
+    long wait = (long)(wifiNextTry - millis()) / 1000L;
+    if (wait < 0) wait = 0;
+    snprintf(l, sizeof(l), "已试 %d 次 · %lds 后重试", wifiTries, wait);
+    u8g2.drawUTF8(3, 54, l);
+    u8g2.drawUTF8(3, 64, "短按=立刻重连");
+  }
+#else
+  u8g2.drawUTF8(3, 40, "SIM 预览");
+#endif
+}
+
 static void renderPopup() {
   u8g2.drawBox(0, 0, 128, 15); u8g2.setDrawColor(0);
   u8g2.setFont(FONT_CN); u8g2.drawUTF8(3, 12, "设备状态"); u8g2.setDrawColor(1);
@@ -1022,6 +1111,7 @@ void render() {
     case UI_MENU:   renderMenu();   break;
     case UI_SLIDER: renderSlider(); break;
     case UI_POPUP:  renderPopup();  break;
+    case UI_WIFI:   renderWifi();   break;
     case UI_NOTE: { Note* n = noteByOffset(viewOffset >= 0 ? viewOffset : 0);
                     if (n) renderNote(n); else renderIdlePanes(); } break;
     default:        renderIdlePanes(); break;
@@ -1085,8 +1175,15 @@ static void menuActivate() {
 #endif
       needRender = true; break;
     case MI_ENCSENS: enterSlider(SET_ENCSENS); break;
+    case MI_AUTOOFF: enterSlider(SET_AUTOOFF); break;
+    case MI_AUTOPWR: enterSlider(SET_AUTOPWR); break;
     case MI_SCREENOFF: setScreen(false); uiState = UI_IDLE; break;
     case MI_POWEROFF:  powerOff(); break;              // 深睡，转旋钮开机；真机不返回
+    case MI_WIFI:                                      // WiFi 状态页：短按=立刻重连一次
+#ifndef SIM_DEMO
+      wifiKick();
+#endif
+      uiState = UI_WIFI; break;
     case MI_REPROV:                                    // 重新配网：记一次性标记重启，开机直进热点
 #ifndef SIM_DEMO
       // 不在运行中切 AP：WebServer 路由无法注销，正常模式的 "/" 会盖住配网页
@@ -1170,6 +1267,13 @@ static void handleInput() {
     case UI_POPUP:
       if (btn || step) uiState = UI_MENU;
       break;
+    case UI_WIFI:                              // 短按=立刻重连，长按/转动=回菜单
+      if (btn == 1) {
+#ifndef SIM_DEMO
+        wifiKick();
+#endif
+      } else if (btn == 2 || step) uiState = UI_MENU;
+      break;
   }
 }
 
@@ -1243,6 +1347,7 @@ h2::after{content:'';flex:1;height:1px;background:var(--ln)}
 min-height:48px;border-bottom:1px solid var(--ln);padding:6px 0}
 .it>span{font-size:15px}
 .mu{color:var(--mu)}small.mu{font-size:12px}
+.hint{color:var(--mu);font-size:12px;line-height:1.5;margin:8px 0 0}
 .sl{display:block;padding:10px 0 4px;border-bottom:1px solid var(--ln)}
 .sl .cap{display:flex;justify-content:space-between;align-items:baseline;font-size:15px}
 .sl output{font:14px var(--mono);color:var(--ink)}
@@ -1312,6 +1417,11 @@ opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
  <div class=it><span>待机屏·左</span><select id=lsty aria-label=待机屏左></select></div>
  <div class=it><span>待机屏·右</span><select id=rsty aria-label=待机屏右></select></div>
 </section>
+<section><h2>POWER · 省电</h2>
+ <div class=it><span>自动熄屏</span><select id=aoff aria-label=自动熄屏></select></div>
+ <div class=it><span>自动关机</span><select id=apwr aria-label=自动关机></select></div>
+ <p class=hint>闲置计时从「最后一条通知」或「最后一次转旋钮」起算，取较晚者。自动关机后转动旋钮开机。</p>
+</section>
 <section><h2>ENCODER · 旋钮</h2>
  <div class=it><span>方向反转</span><label class=tg><input type=checkbox id=encrev><em></em></label></div>
  <div class=it><span>灵敏度</span><select id=encdet aria-label=灵敏度></select></div>
@@ -1325,17 +1435,25 @@ opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
 const $=id=>document.getElementById(id);
 let S=null,busy=0,fails=0;
 const FB=['声音+震动','只震动','只声音','无'],DET=['1 档/步','2 档/步','3 档/步'];
+// 省电下拉：显示名 → 分钟值（与固件 AUTOOFF_MIN_OPTS / AUTOPWR_MIN_OPTS 一致）
+const AOFF=[[0,'关闭'],[1,'1 分钟'],[2,'2 分钟'],[5,'5 分钟'],[10,'10 分钟'],[20,'20 分钟'],[30,'30 分钟']];
+const APWR=[[0,'关闭'],[10,'10 分钟'],[20,'20 分钟'],[30,'30 分钟'],[60,'1 小时'],[120,'2 小时'],[240,'4 小时']];
 function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;
  clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,1300)}
 function setSl(k,v){const r=$(k);r.value=v;r.style.setProperty('--p',v+'%');$('o'+k).value=v}
 function fill(sel,names,cur,base){sel.innerHTML='';(names||[]).forEach((n,i)=>{
  const o=document.createElement('option');o.value=(base||0)+i;o.textContent=n;sel.appendChild(o)});
  sel.value=cur}
+// 值不连续的下拉（省电分钟数）：[值,显示名] 对
+function fillPairs(sel,pairs,cur){sel.innerHTML='';pairs.forEach(([v,n])=>{
+ const o=document.createElement('option');o.value=v;o.textContent=n;sel.appendChild(o)});
+ sel.value=pairs.some(p=>p[0]==cur)?cur:0}
 function render(s){S=s;
  ['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).checked=!!s[k]);
  ['bvol','vvol','fbvol','fbvib'].forEach(k=>setSl(k,s[k]));
  fill($('tone'),s.melodies,s.tone);fill($('fb'),FB,s.fb);fill($('encdet'),DET,s.encdet,1);
- fill($('lsty'),s.panes,s.lsty);fill($('rsty'),s.panes,s.rsty)}
+ fill($('lsty'),s.panes,s.lsty);fill($('rsty'),s.panes,s.rsty);
+ fillPairs($('aoff'),AOFF,s.aoff);fillPairs($('apwr'),APWR,s.apwr)}
 function save(f){busy=1;
  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
   body:new URLSearchParams(f)}).then(r=>r.json()).then(s=>{render(s);toast('已保存')})
@@ -1343,7 +1461,7 @@ function save(f){busy=1;
 function act(k){save({[k]:1});ring()}
 function test(){fetch('/api/test').then(()=>{toast('已发送');ring()}).catch(()=>toast('发送失败'))}
 function ring(){const o=$('oled');o.classList.remove('ring');void o.offsetWidth;o.classList.add('ring')}
-['tone','fb','encdet','lsty','rsty'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
+['tone','fb','encdet','lsty','rsty','aoff','apwr'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
 ['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).checked?1:0}));
 ['bvol','vvol','fbvol','fbvib'].forEach(k=>{const r=$(k);
  r.oninput=()=>{r.style.setProperty('--p',r.value+'%');$('o'+k).value=r.value};
@@ -1434,6 +1552,8 @@ static String settingsJson() {
   j += ",\"nwake\":" + String(notifyWakes ? 1 : 0);
   j += ",\"lsty\":"  + String(leftStyle);
   j += ",\"rsty\":"  + String(rightStyle);
+  j += ",\"aoff\":"  + String(autoOffMin);      // 自动熄屏（分钟，0=关闭）
+  j += ",\"apwr\":"  + String(autoPwrMin);      // 自动关机（分钟，0=关闭）
   j += ",\"melodies\":[";
   for (int i = 0; i < MEL_N; i++) {           // 固定常量名，无需 JSON 转义
     if (i) j += ",";
@@ -1476,6 +1596,15 @@ static void handleApiSettings() {
     encDetents    = argClamp("encdet", encDetents,   1, 3);
     leftStyle     = argClamp("lsty",   leftStyle,    0, PANE_N - 1);
     rightStyle    = argClamp("rsty",   rightStyle,   0, PANE_N - 1);
+    // 自动熄屏/关机：传分钟数，只接受选项表里的值（其它一律当 0=关闭）
+    if (server.hasArg("aoff")) {
+      int v = server.arg("aoff").toInt();
+      autoOffMin = AUTOOFF_MIN_OPTS[autoIdx(AUTOOFF_MIN_OPTS, v)];
+    }
+    if (server.hasArg("apwr")) {
+      int v = server.arg("apwr").toInt();
+      autoPwrMin = AUTOPWR_MIN_OPTS[autoIdx(AUTOPWR_MIN_OPTS, v)];
+    }
     buzzer.setVolume(buzzerVol);              // 同步到输出通道
     vibrator.setVolume(vibVol);
     saveSettings();                           // 存 NVS 掉电不丢
@@ -1586,6 +1715,45 @@ static void renderApScreen() {
   u8g2.drawUTF8(0, 63, l);
   u8g2.sendBuffer();
 }
+
+// ============================================================================
+//  WiFi 掉线自愈：每 wifiRetryGap 主动试连一次（失败翻倍退避到 60s）。
+//  掉线期间停掉 HTTP 服务 —— WebServer 遇半开连接会死等 5s（HTTP_MAX_DATA_WAIT），
+//  那是另一个卡顿源；重连成功再 begin() 回来，顺带清掉残留连接。
+// ============================================================================
+static void wifiTick() {
+  bool up = (WiFi.status() == WL_CONNECTED);
+
+  if (up) {
+    if (!wifiWasUp) {                          // —— 刚恢复 ——
+      Serial.printf("[wifi] 已连上 %s\n", WiFi.localIP().toString().c_str());
+      wifiWasUp = true;
+      wifiRetryGap = WIFI_RETRY_MS;
+      wifiTries = 0;
+      configTime(8 * 3600, 0, "ntp.aliyun.com", "pool.ntp.org");   // 补同步时钟
+      needRender = true;
+    }
+    return;
+  }
+
+  if (wifiWasUp) {                             // —— 刚掉线 ——
+    Serial.println("[wifi] 掉线，进入安静重试（旋钮照常可用）");
+    wifiWasUp = false;
+    wifiLostAt = millis();
+    wifiTries = 0;
+    wifiNextTry = millis() + 1500;             // 先等一下，可能只是瞬断
+    needRender = true;
+  }
+
+  if (millis() >= wifiNextTry) {               // —— 到点试一次 ——
+    wifiTries++;
+    Serial.printf("[wifi] 第 %d 次重连 %s\n", wifiTries, wifiSsid);
+    WiFi.disconnect(false, false);             // 清掉上次失败的状态机
+    WiFi.begin(wifiSsid, wifiPass);            // 非阻塞：结果由下一轮 status() 得知
+    wifiNextTry = millis() + wifiRetryGap;
+    wifiRetryGap = wifiRetryGap * 2 > WIFI_BACKOFF_MAX ? WIFI_BACKOFF_MAX : wifiRetryGap * 2;
+  }
+}
 #endif
 
 #ifdef INO_SIM
@@ -1662,7 +1830,11 @@ void setup() {
   // —— 连 WiFi（OLED 显进度，最多等 20s；连不上自动进配网热点）——
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);               // 关闭 WiFi 省电休眠 → 通知即时响应（USB 供电，不在乎功耗）
-  WiFi.setAutoReconnect(true);        // 路由器重启/信号闪断后由内核自动重连
+  // ⚠ 不用内核 autoReconnect：C3 是单核，掉线后驱动会不停扫描抢 CPU，把 loop 饿到
+  //   旋钮失灵 + 蜂鸣器卡在发声段（间歇长鸣）。改由 wifiTick() 定时、可控地重连。
+  // 开机关联沿用内核自动重试（久经验证：首次关联偶发失败会自动再试，不会误判陌生环境）。
+  // 连上之后再交给 wifiTick() 的可控重连 —— 见下面 setAutoReconnect(false) 那行。
+  WiFi.setAutoReconnect(true);
   WiFi.begin(wifiSsid, wifiPass);
   for (int i = 0; i < 80 && WiFi.status() != WL_CONNECTED; i++) {
     u8g2.clearBuffer();
@@ -1682,6 +1854,11 @@ void setup() {
   // 待机屏时钟：SNTP 后台同步（非阻塞，掉线重连后也会补同步）。中国时区 UTC+8。
   configTime(8 * 3600, 0, "ntp.aliyun.com", "pool.ntp.org");
 
+  // 已连上 → 关掉内核自动重连，掉线改由 wifiTick() 安静、定时地重试。
+  // 内核的重连是「失败即刻再试」的紧循环，在单核 C3 上会抢死主循环（旋钮失灵 +
+  // 蜂鸣器卡在发声段间歇长鸣）；wifiTick 每次只试一下，其余时间 CPU 归 UI。
+  WiFi.setAutoReconnect(false);
+
   // HTTP 服务不依赖连网时序：开机时路由器还没好（如停电恢复）也照常启动，连上 WiFi 即可用。
   // mDNS 要拿到 IP 才有意义，放在 loop 里首次连上后挂载。
   server.on("/notify",  handleNotify);      // 给电脑侧 hook 用（GET/POST 均可）
@@ -1693,6 +1870,9 @@ void setup() {
   server.on("/api/test",     handleApiTest);      // 注入固定测试通知，验证链路
   server.onNotFound([]() { server.send(404, "text/plain", "not found"); });
   server.begin();
+  serverUp = true;
+  wifiWasUp = (WiFi.status() == WL_CONNECTED);   // 与 wifiTick 的边沿检测对齐
+  lastNoteAt = millis();                        // 自动熄屏/关机从开机起算
   if (WiFi.status() != WL_CONNECTED) Serial.println("WiFi 尚未连上，后台继续重连…");
 #else
   // —— 仿真预览（Wokwi）：注入两条示例通知，直接看界面 ——
@@ -1719,6 +1899,20 @@ void loop() {
 #ifdef INO_SIM
   simRefresh();                 // ino-sim：每帧同步 scenario 注入的界面状态
 #endif
+#if defined(DIAG_HEARTBEAT) && !defined(SIM_DEMO)
+  // 诊断版（-DDIAG_HEARTBEAT）：周期回报状态。USB-CDC 会丢掉主机开口前的早期日志，
+  // 靠心跳才能看清设备到底在哪个模式、连的是哪个 SSID。
+  {
+    static unsigned long lastBeat = 0;
+    if (millis() - lastBeat > 2000) {
+      lastBeat = millis();
+      Serial.printf("[beat] ap=%d wifiStatus=%d ip=%s ssid=\"%s\" wasUp=%d srv=%d up=%lus\n",
+                    apMode ? 1 : 0, (int)WiFi.status(),
+                    WiFi.localIP().toString().c_str(), wifiSsid,
+                    wifiWasUp ? 1 : 0, serverUp ? 1 : 0, millis() / 1000);
+    }
+  }
+#endif
 #ifndef SIM_DEMO
   if (apMode) {                 // —— 配网模式：只跑门户 + 屏显，不跑正常 UI ——
     dnsServer.processNextRequest();
@@ -1729,14 +1923,17 @@ void loop() {
     delay(2);
     return;
   }
-  server.handleClient();
+  // 只在连上时收 HTTP：掉线时 WebServer 遇半开连接会死等 5s（HTTP_MAX_DATA_WAIT），
+  // 用状态守卫跳过即可 —— 不去 stop()/begin() 动 socket（网络已 down 时释放 lwIP
+  // 套接字会崩，2026-08-05 实测过）。
+  if (WiFi.status() == WL_CONNECTED) server.handleClient();
+  wifiTick();                                // 掉线自愈（安静重试，不抢 CPU）
   // 首次连上 WiFi 后挂载 mDNS（开机没连上时每 2s 补查一次；掉线重连无需重挂）
   static bool mdnsUp = false;
   static unsigned long lastNetChk = 0;
   if (!mdnsUp && millis() - lastNetChk > 2000) {
     lastNetChk = millis();
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.printf("WiFi OK: %s\n", WiFi.localIP().toString().c_str());
       if (MDNS.begin(MDNS_NAME)) MDNS.addService("http", "tcp", 80);
       mdnsUp = true;
     }
@@ -1759,8 +1956,22 @@ void loop() {
     uiState = UI_IDLE;
   }
 
+  // —— 省电：无通知且无操作达到设定时长 → 自动熄屏 / 自动关机（0=关闭）——
+  // 计时基准 lastActivity() = 通知与旋钮操作取较晚者，所以正在操作时不会突然黑屏/关机。
+  if (autoOffMin > 0 && !screenOff && uiState == UI_IDLE &&
+      millis() - lastActivity() > (unsigned long)autoOffMin * 60000UL) {
+    Serial.printf("[power] 闲置 %d 分钟，自动熄屏\n", autoOffMin);
+    setScreen(false);
+  }
+  if (autoPwrMin > 0 && millis() - lastActivity() > (unsigned long)autoPwrMin * 60000UL) {
+    Serial.printf("[power] 闲置 %d 分钟，自动关机\n", autoPwrMin);
+    powerOff();                      // 真机不返回（深睡，转旋钮开机）
+    lastInput = millis();            // 仿真端会返回：重置计时，避免每轮重复触发
+  }
+
   // 菜单动画期高刷（~45fps）；待机/通知 40ms（宇航员 80ms/帧，采样需更密才不跳帧；熄屏时 render 直接返回）
-  unsigned long interval = (uiState == UI_MENU || uiState == UI_SLIDER || uiState == UI_POPUP) ? 22 : 40;
+  unsigned long interval = (uiState == UI_MENU || uiState == UI_SLIDER || uiState == UI_POPUP ||
+                            uiState == UI_WIFI) ? 22 : 40;
   if (needRender || millis() - lastRender > interval) {
     render();
     needRender = false;
