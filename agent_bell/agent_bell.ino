@@ -41,7 +41,7 @@ struct Note;
 struct ListAnim;
 struct SetMeta;
 enum SubMenu { SUB_NONE, SUB_MELODY };                          // 选项子列表（当前仅提示音用竖列表）
-enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE, SET_AUTOOFF, SET_AUTOPWR };  // 滑块设置项（定义在顶部，供自动原型引用）
+enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE, SET_AUTOOFF, SET_AUTOPWR, SET_PWRMODE };  // 滑块设置项（定义在顶部，供自动原型引用）
 
 // ===== 硬件引脚（ESP32-C3 SuperMini，全部避开 strapping 脚 2/8/9）=====
 #define OLED_SDA   5      // I2C 数据
@@ -132,8 +132,10 @@ class Pulser {
  public:
   void begin(uint8_t pin, bool activeHigh, uint32_t freq) {
     pin_ = pin; activeHigh_ = activeHigh;
+    pinMode(pin_, OUTPUT);                      // 同蜂鸣器：先锁「不动」电平再挂 LEDC
+    digitalWrite(pin_, activeHigh ? LOW : HIGH);
 #ifdef INO_SIM
-    (void)freq; pinMode(pin_, OUTPUT);          // 仿真主机端无 LEDC，退化为数字开关
+    (void)freq;                                 // 仿真主机端无 LEDC，退化为数字开关
 #else
     ledcAttach(pin_, freq, 8);                  // 8-bit PWM，占空比即强度/响度
 #endif
@@ -188,10 +190,13 @@ class ToneBuzzer {
  public:
   void begin(uint8_t pin) {
     pin_ = pin;
+    // 先把脚锁在「静音」电平再挂 LEDC：ledcAttach 的初始占空比是 0（输出低），
+    // 而蜂鸣器是 PNP 低有效 —— 会有一瞬直流灌进线圈（约 200mA + 一声「咔」）。
+    // 开机本就是电池最紧张的时刻，这个尖峰要掉。
+    pinMode(pin_, OUTPUT);
+    digitalWrite(pin_, HIGH);
 #ifndef INO_SIM
     ledcAttach(pin_, 2700, 8);                 // 先挂上，频率随音序实时改
-#else
-    pinMode(pin_, OUTPUT);
 #endif
     idleSilent();
   }
@@ -301,7 +306,8 @@ static int encButton() {
 }
 
 // ============================================================================
-//  通知环形缓冲（保留最近 8 条）
+//  通知环形缓冲：暂存「还没看的」通知，最多 8 条（满了新的顶掉最旧的）。
+//  不是历史存档 —— 在通知屏按一下旋钮就整批清空（看完即销毁）。
 // ============================================================================
 struct Note {
   char computer[24];
@@ -353,6 +359,14 @@ int  rightStyle    = 1;       // 待机屏右半模块索引
 // —— 省电：闲置多久自动熄屏 / 自动关机（0=不启用）。计时基准见 lastActivity() ——
 int  autoOffMin    = 0;       // 无通知且无操作 N 分钟后熄屏（0=关闭）
 int  autoPwrMin    = 0;       // 无通知且无操作 N 分钟后关机（0=关闭）
+// —— 电源模式：板上没有 USB 检测脚也没有电池 ADC，固件无法自知供电来源，故给出显式选择 ——
+//   0=自动：默认按「性能」跑；一旦发生过掉电复位就永久转「省电」（记 NVS，换电池也记得）
+//   1=性能：满发射功率 + 不休眠 + 160MHz，通知最快，适合插着 USB
+//   2=省电：按信号强度选发射功率 + 调制解调器休眠 + 80MHz + 通知音量封顶，适合电池
+int  powerProfile  = 0;
+static const char* PWRMODE_OPTS[] = {"自动", "性能", "省电"};
+bool nvsBrownout   = false;   // 历史上是否掉电过（NVS，断电也不丢；用于「自动」判定）
+int  effPowerMode  = 1;       // 当前实际生效的模式（1=性能 2=省电，供界面显示）
 static const int AUTOOFF_MIN_OPTS[] = {0, 1, 2, 5, 10, 20, 30};        // 熄屏可选分钟
 static const int AUTOPWR_MIN_OPTS[] = {0, 10, 20, 30, 60, 120, 240};   // 关机可选分钟
 static const char* AUTOOFF_OPTS[] = {"关闭", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "20 分钟", "30 分钟"};
@@ -374,6 +388,19 @@ static void (* const PANE_FNS[])(int) = {paneAstro, paneClock, paneAnalog, paneB
 static const int PANE_N = sizeof(PANE_NAMES) / sizeof(PANE_NAMES[0]);
 bool screenOff   = false;         // 屏幕是否熄灭（运行时，不持久）
 bool notifyWakes = true;          // 熄屏时来通知是否自动亮屏
+
+// ===== 掉电（欠压）诊断与保护 =====
+// 电池供电时 WiFi 发射峰值电流会把 3.3V 轨拽到欠压阈值以下 → 芯片复位 → 重启又连
+// WiFi → 又复位，形成无限重启（屏幕定格在最后一帧，看着像"卡死"）。
+// esp_reset_reason()==ESP_RST_BROWNOUT 就是铁证。计数存 RTC 内存（复位不丢、断电才清），
+// 连续掉电就自动进「省电保护」：降发射功率 + 开调制解调器休眠 + 延后连 WiFi 让电池回压。
+#ifndef RTC_DATA_ATTR
+  #define RTC_DATA_ATTR            // ino-sim 主机端没有 RTC 内存，退化为普通变量
+#endif
+RTC_DATA_ATTR int rtcBrownouts = 0;   // 连续掉电复位次数（RTC 内存，跨复位保留）
+bool lastResetBrownout = false;       // 本次开机是否由掉电复位而来
+int  brownoutSeen = 0;                // 本次开机看到的连续掉电次数（状态页显示）
+bool lowPowerGuard = false;           // 是否已进入省电保护模式
 
 // ===== UI 状态机（编码器导航的丝滑菜单）=====
 enum UiState { UI_IDLE, UI_NOTE, UI_MENU, UI_SLIDER, UI_POPUP, UI_WIFI };
@@ -463,6 +490,8 @@ static void loadSettings() {
   rightStyle    = prefs.getInt("rsty", 1);   if (rightStyle < 0 || rightStyle >= PANE_N) rightStyle = 1;
   autoOffMin    = prefs.getInt("aoff", 0);   if (autoIdx(AUTOOFF_MIN_OPTS, autoOffMin) == 0) autoOffMin = 0;   // 非法值归零=关闭
   autoPwrMin    = prefs.getInt("apwr", 0);   if (autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin) == 0) autoPwrMin = 0;
+  powerProfile  = prefs.getInt("pwr", 0);    if (powerProfile < 0 || powerProfile > 2) powerProfile = 0;
+  nvsBrownout   = prefs.getBool("bo", false);   // 历史掉电标记（断电也不丢）
   prefs.end();
   buzzer.setVolume(buzzerVol);
   vibrator.setVolume(vibVol);
@@ -485,9 +514,61 @@ static void saveSettings() {
   prefs.putInt("rsty", rightStyle);
   prefs.putInt("aoff", autoOffMin);
   prefs.putInt("apwr", autoPwrMin);
+  prefs.putInt("pwr", powerProfile);
   prefs.end();
 }
 #endif
+
+// ============================================================================
+//  电源模式生效：发射功率 / 调制解调器休眠 / CPU 主频
+// ----------------------------------------------------------------------------
+//  为什么这三项：v2 电池路径（VBAT→SS34→SuperMini 板载 LDO）余量只有零点几伏，
+//  WiFi 发射峰值电流一来就欠压复位。三项分别压住「峰值」「平均」「基线」电流：
+//    · 发射功率：19.5dBm 峰值约 350mA，13dBm 约降三分之一 —— 影响最大的一项；
+//      但功率不能一压到底，信号弱时会掉线，所以按实测 RSSI 分档；
+//    · 调制解调器休眠：常态接收 ~80mA → 平均 20~30mA，代价是通知延迟 +100ms 量级；
+//    · CPU 80MHz（WiFi 在跑时的最低档）：比 160MHz 省 20~30mA，UI 是 I2C 受限，无感。
+//  省电模式还给通知音量封顶（蜂鸣 200mA + 马达 100mA 会和 WiFi 峰值叠在一起）。
+// ============================================================================
+static const int LOWPWR_VOL_CAP = 70;      // 省电模式下通知蜂鸣/震动的音量上限
+
+#ifndef SIM_DEMO
+static void applyPowerProfile() {
+  // 「自动」= 没掉电过就按性能跑，掉过就转省电（本次 RTC 计数或历史 NVS 标记任一为真）
+  bool saver = (powerProfile == 2) ||
+               (powerProfile == 0 && (brownoutSeen > 0 || nvsBrownout));
+  effPowerMode = saver ? 2 : 1;
+
+  if (!saver) {
+    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    WiFi.setSleep(false);                  // 不休眠 → 通知最快
+    setCpuFrequencyMhz(160);
+    Serial.println("[power] 性能模式：TX 19.5dBm · 不休眠 · 160MHz");
+    return;
+  }
+
+  // 省电：发射功率按信号强度分档（够用就好，不浪费在峰值电流上）
+  int rssi = (WiFi.status() == WL_CONNECTED) ? (int)WiFi.RSSI() : -80;
+  wifi_power_t tx;
+  const char* txName;
+  if (rssi > -55)      { tx = WIFI_POWER_11dBm; txName = "11dBm"; }   // 信号很强，压到底
+  else if (rssi > -68) { tx = WIFI_POWER_13dBm; txName = "13dBm"; }
+  else                 { tx = WIFI_POWER_15dBm; txName = "15dBm"; }   // 信号弱，保连接优先
+  WiFi.setTxPower(tx);
+  WiFi.setSleep(WIFI_PS_MIN_MODEM);        // 随 DTIM 醒来收包，通知延迟 +100ms 量级
+  setCpuFrequencyMhz(80);
+  Serial.printf("[power] 省电模式：TX %s（RSSI %d）· 调制解调器休眠 · 80MHz\n", txName, rssi);
+}
+
+// 记下「掉电过」这件事：写 NVS，换电池/断电也不忘，「自动」模式据此长期转省电
+static void markBrownoutSticky() {
+  if (nvsBrownout) return;
+  nvsBrownout = true;
+  prefs.begin("agentbell", false);
+  prefs.putBool("bo", true);
+  prefs.end();
+}
+#endif  // !SIM_DEMO
 
 // 亮屏 / 熄屏（SSD1306 省电指令）
 static void setScreen(bool on) {
@@ -560,9 +641,12 @@ void fireAlert(const Note& n) {
   addNote(n);
   lastNoteAt = millis();                          // 自动熄屏/关机的计时重新起算
   uiState = UI_NOTE;                              // 通知打断任何界面
-  // 不传音量覆盖 → 用 setVolume 同步进来的「蜂鸣强度/震动强度」设置值
-  if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len);
-  if (!dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]));
+  // 省电模式给通知响铃/震动封顶：蜂鸣 ~200mA + 马达 ~100mA 会和 WiFi 收包峰值叠在
+  // 一起，正好是刚收到通知那一刻 —— 电池带不动就会当场掉电重启。
+  int aVol = (effPowerMode == 2 && buzzerVol > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
+  int aVib = (effPowerMode == 2 && vibVol    > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
+  if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len, aVol);
+  if (!dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]), aVib);
   if (screenOff && notifyWakes) setScreen(true);   // 熄屏时按设置决定是否自动亮屏
   needRender = true;
   Serial.printf("[notify] %s / %s / %s\n", n.computer, n.agent, n.conversation);
@@ -897,7 +981,7 @@ static void renderNote(const Note* n) {
 // 勿扰和旋钮方向是开关项：短按直接切换，名字里带当前状态。
 enum MainId { MI_DND, MI_TONE, MI_NVOL, MI_NVIB, MI_FBMODE, MI_FBVOL, MI_FBVIB,
               MI_LSTYLE, MI_RSTYLE, MI_ENCDIR, MI_ENCSENS,
-              MI_AUTOOFF, MI_AUTOPWR, MI_SCREENOFF, MI_POWEROFF,
+              MI_AUTOOFF, MI_AUTOPWR, MI_PWRMODE, MI_SCREENOFF, MI_POWEROFF,
               MI_WIFI, MI_REPROV, MI_SIMNOTE, MI_STATUS, MAIN_N_ };
 static const int MAIN_N = MAIN_N_;
 static const char* mainName(int i) {
@@ -916,6 +1000,7 @@ static const char* mainName(int i) {
     case MI_ENCSENS: return "旋钮灵敏度";
     case MI_AUTOOFF: return "自动熄屏";
     case MI_AUTOPWR: return "自动关机";
+    case MI_PWRMODE: return "电源模式";
     case MI_SCREENOFF: return "立即熄屏";
     case MI_POWEROFF:  return "立即关机";
     case MI_WIFI:      return "WiFi 状态";
@@ -977,6 +1062,7 @@ static SetMeta setMeta(SetId id) {
     case SET_RSTYLE: return {"右屏样式", false, PANE_NAMES, PANE_N};
     case SET_AUTOOFF: return {"自动熄屏", false, AUTOOFF_OPTS, AUTO_OPT_N};
     case SET_AUTOPWR: return {"自动关机", false, AUTOPWR_OPTS, AUTO_OPT_N};
+    case SET_PWRMODE: return {"电源模式", false, PWRMODE_OPTS, 3};
     default:         return {"旋钮灵敏度", false, ENCSENS_OPTS, 3};  // SET_ENCSENS
   }
 }
@@ -989,6 +1075,7 @@ static int setGet(SetId id) {
     case SET_RSTYLE: return rightStyle;
     case SET_AUTOOFF: return autoIdx(AUTOOFF_MIN_OPTS, autoOffMin);
     case SET_AUTOPWR: return autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin);
+    case SET_PWRMODE: return powerProfile;
     default:         return encDetents - 1;         // SET_ENCSENS
   }
 }
@@ -1003,6 +1090,11 @@ static void setPut(SetId id, int v) {
     case SET_RSTYLE: rightStyle = v; break;
     case SET_AUTOOFF: autoOffMin = AUTOOFF_MIN_OPTS[v]; break;
     case SET_AUTOPWR: autoPwrMin = AUTOPWR_MIN_OPTS[v]; break;
+    case SET_PWRMODE: powerProfile = v;
+#ifndef SIM_DEMO
+                      applyPowerProfile();       // 选完立刻生效
+#endif
+                      break;
     default:         encDetents = v + 1; break;      // SET_ENCSENS
   }
 }
@@ -1096,9 +1188,14 @@ static void renderPopup() {
   u8g2.setFont(FONT_CN); u8g2.drawUTF8(3, 12, "设备状态"); u8g2.setDrawColor(1);
   char l[44];
 #ifndef SIM_DEMO
-  snprintf(l, sizeof(l), "IP %s", WiFi.localIP().toString().c_str());  u8g2.drawUTF8(3, 32, l);
-  snprintf(l, sizeof(l), "信号 %d dBm", (int)WiFi.RSSI());             u8g2.drawUTF8(3, 46, l);
-  snprintf(l, sizeof(l), "运行 %lu 秒", millis() / 1000);              u8g2.drawUTF8(3, 60, l);
+  snprintf(l, sizeof(l), "IP %s", WiFi.localIP().toString().c_str());  u8g2.drawUTF8(3, 28, l);
+  snprintf(l, sizeof(l), "信号 %d dBm%s", (int)WiFi.RSSI(), lowPowerGuard ? " 省电" : "");
+  u8g2.drawUTF8(3, 41, l);
+  snprintf(l, sizeof(l), "运行 %lu 秒", millis() / 1000);              u8g2.drawUTF8(3, 54, l);
+  // 掉电诊断：非 0 就说明电池带不动峰值电流（正常供电下永远是 0）
+  if (brownoutSeen > 0) snprintf(l, sizeof(l), "掉电重启 %d 次·请充电", brownoutSeen);
+  else                  strlcpy(l, "供电正常", sizeof(l));
+  u8g2.drawUTF8(3, 64, l);
 #else
   u8g2.setFont(FONT_CN); u8g2.drawUTF8(3, 40, "SIM 预览");
 #endif
@@ -1177,6 +1274,7 @@ static void menuActivate() {
     case MI_ENCSENS: enterSlider(SET_ENCSENS); break;
     case MI_AUTOOFF: enterSlider(SET_AUTOOFF); break;
     case MI_AUTOPWR: enterSlider(SET_AUTOPWR); break;
+    case MI_PWRMODE: enterSlider(SET_PWRMODE); break;
     case MI_SCREENOFF: setScreen(false); uiState = UI_IDLE; break;
     case MI_POWEROFF:  powerOff(); break;              // 深睡，转旋钮开机；真机不返回
     case MI_WIFI:                                      // WiFi 状态页：短按=立刻重连一次
@@ -1225,8 +1323,11 @@ static void handleInput() {
       if (step != 0 || btn == 1) { uiState = UI_MENU; curSub = SUB_NONE; mainAnim.sel = mainSel; }
       break;
     case UI_NOTE:
-      if (btn) { unread = 0; viewOffset = -1; uiState = UI_IDLE; }
-      else if (step) {
+      // 看完即销毁：按一下把待看通知全部清空，不留历史（设备不当通知存档用）
+      if (btn) {
+        ringCount = 0; ringHead = 0; unread = 0; viewOffset = -1;
+        uiState = UI_IDLE;
+      } else if (step) {                       // 多条未看时可前后翻（清空前的临时浏览）
         viewOffset += (step > 0 ? 1 : -1);
         if (viewOffset < 0) viewOffset = 0;
         if (viewOffset > ringCount - 1) viewOffset = ringCount - 1;
@@ -1420,13 +1521,15 @@ opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
 <section><h2>POWER · 省电</h2>
  <div class=it><span>自动熄屏</span><select id=aoff aria-label=自动熄屏></select></div>
  <div class=it><span>自动关机</span><select id=apwr aria-label=自动关机></select></div>
+ <div class=it><span>电源模式</span><select id=pwr aria-label=电源模式></select></div>
+ <p class=hint id=pwrhint></p>
  <p class=hint>闲置计时从「最后一条通知」或「最后一次转旋钮」起算，取较晚者。自动关机后转动旋钮开机。</p>
 </section>
 <section><h2>ENCODER · 旋钮</h2>
  <div class=it><span>方向反转</span><label class=tg><input type=checkbox id=encrev><em></em></label></div>
  <div class=it><span>灵敏度</span><select id=encdet aria-label=灵敏度></select></div>
 </section>
-<section><h2>LOG · 最近通知</h2>
+<section><h2>LOG · 待看通知</h2>
  <ul id=notes><li class=mu>加载中……</li></ul>
  <div class=btns><button class="k pri" onclick="test()">发测试通知</button></div>
 </section>
@@ -1453,7 +1556,12 @@ function render(s){S=s;
  ['bvol','vvol','fbvol','fbvib'].forEach(k=>setSl(k,s[k]));
  fill($('tone'),s.melodies,s.tone);fill($('fb'),FB,s.fb);fill($('encdet'),DET,s.encdet,1);
  fill($('lsty'),s.panes,s.lsty);fill($('rsty'),s.panes,s.rsty);
- fillPairs($('aoff'),AOFF,s.aoff);fillPairs($('apwr'),APWR,s.apwr)}
+ fillPairs($('aoff'),AOFF,s.aoff);fillPairs($('apwr'),APWR,s.apwr);
+ fill($('pwr'),['自动','性能','省电'],s.pwr);
+ $('pwrhint').textContent=(s.effpwr==2
+  ?'当前按省电跑：降发射功率 + 调制解调器休眠 + 80MHz + 通知音量封顶（通知延迟 +0.1s 量级）。'
+  :'当前按性能跑：满发射功率、不休眠、160MHz，通知最快。')
+  +(s.pwr==0?'「自动」会在发生过掉电重启后永久转省电。':'')}
 function save(f){busy=1;
  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
   body:new URLSearchParams(f)}).then(r=>r.json()).then(s=>{render(s);toast('已保存')})
@@ -1461,7 +1569,7 @@ function save(f){busy=1;
 function act(k){save({[k]:1});ring()}
 function test(){fetch('/api/test').then(()=>{toast('已发送');ring()}).catch(()=>toast('发送失败'))}
 function ring(){const o=$('oled');o.classList.remove('ring');void o.offsetWidth;o.classList.add('ring')}
-['tone','fb','encdet','lsty','rsty','aoff','apwr'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
+['tone','fb','encdet','lsty','rsty','aoff','apwr','pwr'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
 ['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).checked?1:0}));
 ['bvol','vvol','fbvol','fbvib'].forEach(k=>{const r=$(k);
  r.oninput=()=>{r.style.setProperty('--p',r.value+'%');$('o'+k).value=r.value};
@@ -1478,7 +1586,7 @@ function refresh(){if(busy)return;
   $('big').innerHTML=a.length?esc(a[0].agent)+' <small>'+esc(a[0].conversation)+'</small>'
                              :'待机中<span class=cur>▮</span>';
   const u=$('notes');u.innerHTML='';
-  if(!a.length){u.innerHTML='<li class=mu>还没有通知。点下方按钮试一条。</li>';return}
+  if(!a.length){u.innerHTML='<li class=mu>没有待看通知（设备上按一下旋钮即清空）。</li>';return}
   a.forEach(n=>{const li=document.createElement('li');
    li.innerHTML='<b></b> · <span></span> · <span></span> <span class=mu></span>';
    const e=li.querySelectorAll('b,span');e[0].textContent=n.agent;e[1].textContent=n.computer;
@@ -1490,7 +1598,8 @@ static void handleRoot() {
   server.send_P(200, "text/html; charset=utf-8", CONSOLE_HTML);
 }
 
-// 最近通知 → JSON 数组（控制台用；文本来自电脑侧，需转义防注入/防坏 JSON）
+// 待看通知 → JSON 数组（控制台用；设备上按一下旋钮即清空，故这里通常是空的）。
+// 文本来自电脑侧，需转义防注入/防坏 JSON。
 static void jsonEscapeTo(String& out, const char* s) {
   for (const char* p = s; *p; p++) {
     unsigned char c = (unsigned char)*p;
@@ -1529,6 +1638,9 @@ static void handleApiInfo() {
   j += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
   j += ",\"rssi\":" + String(WiFi.RSSI());
   j += ",\"uptime_s\":" + String(millis() / 1000);
+  j += ",\"brownouts\":" + String(brownoutSeen);            // 本次开机的连续掉电次数（正常供电恒为 0）
+  j += ",\"lowpower\":" + String(effPowerMode == 2 ? 1 : 0);  // 当前是否按省电跑（含历史掉电导致的）
+  j += ",\"bosticky\":" + String(nvsBrownout ? 1 : 0);        // 历史上掉过电（NVS，断电不丢）
   j += "}";
   server.send(200, "application/json; charset=utf-8", j);
 }
@@ -1554,6 +1666,8 @@ static String settingsJson() {
   j += ",\"rsty\":"  + String(rightStyle);
   j += ",\"aoff\":"  + String(autoOffMin);      // 自动熄屏（分钟，0=关闭）
   j += ",\"apwr\":"  + String(autoPwrMin);      // 自动关机（分钟，0=关闭）
+  j += ",\"pwr\":"   + String(powerProfile);    // 电源模式 0自动 1性能 2省电
+  j += ",\"effpwr\":" + String(effPowerMode);   // 实际生效 1性能 2省电（只读）
   j += ",\"melodies\":[";
   for (int i = 0; i < MEL_N; i++) {           // 固定常量名，无需 JSON 转义
     if (i) j += ",";
@@ -1600,6 +1714,10 @@ static void handleApiSettings() {
     if (server.hasArg("aoff")) {
       int v = server.arg("aoff").toInt();
       autoOffMin = AUTOOFF_MIN_OPTS[autoIdx(AUTOOFF_MIN_OPTS, v)];
+    }
+    if (server.hasArg("pwr")) {
+      powerProfile = argClamp("pwr", powerProfile, 0, 2);
+      applyPowerProfile();                    // 立刻生效
     }
     if (server.hasArg("apwr")) {
       int v = server.arg("apwr").toInt();
@@ -1796,6 +1914,15 @@ static void simRefresh() {
 void setup() {
   Serial.begin(115200);
 #if !defined(SIM_DEMO) && !defined(INO_SIM)
+  // —— 上次复位原因：掉电（欠压）复位说明电池带不动 WiFi 峰值电流 ——
+  esp_reset_reason_t rr = esp_reset_reason();
+  lastResetBrownout = (rr == ESP_RST_BROWNOUT);
+  if (lastResetBrownout) rtcBrownouts++;
+  else if (rr != ESP_RST_DEEPSLEEP) rtcBrownouts = 0;   // 正常上电/复位才清零（深睡唤醒保留计数）
+  brownoutSeen = rtcBrownouts;
+  lowPowerGuard = (rtcBrownouts >= 1);                 // 掉过一次就开保护，别再往枪口上撞
+  Serial.printf("[boot] reset_reason=%d brownouts=%d guard=%d\n", (int)rr, rtcBrownouts, lowPowerGuard ? 1 : 0);
+
   // 若是从「关机」深睡醒来：先解除引脚锁定，否则蜂鸣/震动脚被 hold 住无法驱动
   gpio_hold_dis((gpio_num_t)BUZZER_PIN);
   gpio_hold_dis((gpio_num_t)VIB_PIN);
@@ -1827,16 +1954,56 @@ void setup() {
     return;
   }
 
+  // —— 掉电复位过：先告警 + 让电池回压，再连 WiFi ——
+  // 电池带不动 WiFi 峰值电流时，越急着重连越是接着掉电。这里先停几秒让电芯电压
+  // 回升（锂电撤载后端电压会回弹），并把这次重启的原因明确告诉用户。
+  if (lastResetBrownout) {
+    u8g2.clearBuffer();
+    u8g2.setFont(FONT_CN);
+    u8g2.drawUTF8(10, 16, "电池电压不足");
+    u8g2.drawUTF8(4, 33, "上次因掉电重启");
+    char l[32];
+    snprintf(l, sizeof(l), "已连续 %d 次 · 请充电", rtcBrownouts);
+    u8g2.drawUTF8(4, 50, l);
+    u8g2.drawUTF8(4, 63, "省电模式启动中…");
+    u8g2.sendBuffer();
+    delay(rtcBrownouts >= 3 ? 6000 : 2500);   // 连续掉电就等更久，给电池更多回压时间
+  }
+
   // —— 连 WiFi（OLED 显进度，最多等 20s；连不上自动进配网热点）——
   WiFi.mode(WIFI_STA);
-  WiFi.setSleep(false);               // 关闭 WiFi 省电休眠 → 通知即时响应（USB 供电，不在乎功耗）
-  // ⚠ 不用内核 autoReconnect：C3 是单核，掉线后驱动会不停扫描抢 CPU，把 loop 饿到
-  //   旋钮失灵 + 蜂鸣器卡在发声段（间歇长鸣）。改由 wifiTick() 定时、可控地重连。
+  // 关联阶段先用保守发射功率：这是电流最紧张的窗口，别一上来就拉满峰值。
+  // 连上之后由 applyPowerProfile() 按实测 RSSI 和电源模式定档。
+  WiFi.setTxPower(lowPowerGuard ? WIFI_POWER_13dBm : WIFI_POWER_15dBm);
   // 开机关联沿用内核自动重试（久经验证：首次关联偶发失败会自动再试，不会误判陌生环境）。
   // 连上之后再交给 wifiTick() 的可控重连 —— 见下面 setAutoReconnect(false) 那行。
   WiFi.setAutoReconnect(true);
-  WiFi.begin(wifiSsid, wifiPass);
+
+  // 优先用上次记住的 BSSID + 信道直连：跳过 13 个信道的全扫描，关联从数秒缩到几百
+  // 毫秒 —— 开机是电池最紧张的时刻，缩短高电流窗口和降功率一样重要。
+  uint8_t cachedBssid[6];
+  int cachedChan = 0;
+  bool haveCache = false;
+  prefs.begin("agentbell", true);
+  if (prefs.getBytesLength("bssid") == 6) {
+    prefs.getBytes("bssid", cachedBssid, 6);
+    cachedChan = prefs.getInt("chan", 0);
+    haveCache = (cachedChan >= 1 && cachedChan <= 14);
+  }
+  prefs.end();
+  if (haveCache) {
+    Serial.printf("[wifi] 缓存直连：信道 %d\n", cachedChan);
+    WiFi.begin(wifiSsid, wifiPass, cachedChan, cachedBssid, true);
+  } else {
+    WiFi.begin(wifiSsid, wifiPass);
+  }
   for (int i = 0; i < 80 && WiFi.status() != WL_CONNECTED; i++) {
+    if (haveCache && i == 32) {              // 缓存直连 8s 不成（换信道/换 AP）→ 退回全扫描
+      Serial.println("[wifi] 缓存直连失败，改全信道扫描");
+      haveCache = false;
+      WiFi.disconnect(false, false);
+      WiFi.begin(wifiSsid, wifiPass);
+    }
     u8g2.clearBuffer();
     u8g2.setFont(FONT_CN);
     u8g2.drawUTF8(0, 24, "正在连接 WiFi");
@@ -1853,6 +2020,20 @@ void setup() {
   }
   // 待机屏时钟：SNTP 后台同步（非阻塞，掉线重连后也会补同步）。中国时区 UTC+8。
   configTime(8 * 3600, 0, "ntp.aliyun.com", "pool.ntp.org");
+
+  // 记住这次连上的 AP（BSSID + 信道），下次开机直连、跳过全信道扫描
+  {
+    uint8_t* bs = WiFi.BSSID();
+    int ch = WiFi.channel();
+    if (bs && ch >= 1 && ch <= 14) {
+      prefs.begin("agentbell", false);
+      prefs.putBytes("bssid", bs, 6);
+      prefs.putInt("chan", ch);
+      prefs.end();
+    }
+  }
+  if (lastResetBrownout) markBrownoutSticky();   // 掉过电就长期记住（「自动」模式据此转省电）
+  applyPowerProfile();                           // 按电源模式 + 实测 RSSI 定发射功率/休眠/主频
 
   // 已连上 → 关掉内核自动重连，掉线改由 wifiTick() 安静、定时地重试。
   // 内核的重连是「失败即刻再试」的紧循环，在单核 C3 上会抢死主循环（旋钮失灵 +
@@ -1936,6 +2117,14 @@ void loop() {
     if (WiFi.status() == WL_CONNECTED) {
       if (MDNS.begin(MDNS_NAME)) MDNS.addService("http", "tcp", 80);
       mdnsUp = true;
+    }
+  }
+  // 省电模式下每 60s 按当前信号强度重新定发射功率（换了位置/信号变化就跟着调）
+  {
+    static unsigned long lastPwrChk = 0;
+    if (effPowerMode == 2 && WiFi.status() == WL_CONNECTED && millis() - lastPwrChk > 60000) {
+      lastPwrChk = millis();
+      applyPowerProfile();
     }
   }
 #endif
