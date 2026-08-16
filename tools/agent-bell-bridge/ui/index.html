@@ -373,7 +373,8 @@ let api = null;
 const MOCK = {
   state:{online:true,host:'192.168.31.133',scanning:false,scan_done:0,scan_total:0,
     rssi:-52,uptime_s:8130,listener:'ok',forward:true,autostart:true,
-    keywords:'claude, codex',poll_s:2,cooldown_s:3,manual:'192.168.31.133',platform:'win'},
+    keywords:'claude, codex',poll_s:2,cooldown_s:3,manual:'192.168.31.133',platform:'win',
+    panel_poll_s:30,strikes:0},
   dev:{buzz:1,vib:1,dnd:0,nwake:1,encrev:0,bvol:70,vvol:80,fbvol:40,fbvib:50,
     tone:0,fb:0,encdet:1,lsty:1,rsty:0,
     melodies:['叮咚·经典','柔和三音','上行叮铃','双叮·短促','琶音上行','滑音','单长音'],
@@ -389,6 +390,7 @@ function mockApi(){
   return {
     get_state:async()=>({...MOCK.state}),
     get_device_settings:async()=>({...MOCK.dev}),
+    get_panel:async()=>({settings:{...MOCK.dev},notes:MOCK.notes.slice()}),
     get_notes:async()=>MOCK.notes.slice(),
     apply_device:async f=>{for(const[k,v]of Object.entries(f||{}))if(k in MOCK.dev)MOCK.dev[k]=+v;return{...MOCK.dev}},
     send_test:async()=>true, rediscover:async()=>true,
@@ -475,7 +477,7 @@ function initStepper(el,opt){
   el.innerHTML='<button type="button" aria-label="上一个">‹</button><b>–</b><button type="button" aria-label="下一个">›</button>';
   const [prev,next]=el.querySelectorAll('button'), cell=el.querySelector('b');
   if(opt.width)cell.style.minWidth=opt.width+'px';
-  const go=d=>{const r=opt.bump(d);if(r!=null)cell.textContent=r};
+  const go=async d=>{const r=await opt.bump(d);if(r!=null)cell.textContent=r};
   prev.onclick=()=>go(-1);next.onclick=()=>go(1);
   if(opt.menu){
     cell.tabIndex=0;
@@ -539,18 +541,25 @@ let editingKw=false,PLAT='win';
 function renderState(st){
   PLAT=st.platform||'win';
   if(st.online){
-    setLine('d0','online  '+st.host,'ok');
-    $('led').className='ok';
+    // 探活连败但还没判离线：说出来，别让用户以为一切正常又收不到通知
+    if(st.strikes>0){
+      setLine('d0','online  '+st.host+'  · 探活重试 '+st.strikes+'/3','warn');
+      $('led').className='warn';
+    }else{
+      setLine('d0','online  '+st.host,'ok');
+      $('led').className='ok';
+    }
     $('d2').textContent='rssi '+(st.rssi??'?')+'dBm · up '+fmtUp(st.uptime_s);
   }else if(st.scanning){
     const p=st.scan_total?('  '+st.scan_done+'/'+st.scan_total):'';
-    setLine('d0','scanning...'+p,'warn');
+    setLine('d0','searching...'+p,'warn');
     $('led').className='warn';
-    $('d2').innerHTML='&nbsp;';
+    $('d2').textContent=st.scan_total?'正在逐个试局域网地址':'先试上次地址和 mDNS 广播';
   }else{
-    setLine('d0','offline (auto retry)','err');
+    setLine('d0','offline','err');
     $('led').className='err';
-    $('d2').innerHTML='&nbsp;';
+    // 离线最常见的原因就是设备自己关机了（长时间没通知、也没人碰它）
+    $('d2').textContent='找不到设备：确认它开着（转一下旋钮唤醒）且在同一 WiFi';
   }
   if(st.listener==='ok')setLine('d1','running','ok');
   else if(st.listener==='no_access'){setLine('d1','no access','err');
@@ -621,7 +630,11 @@ const stCool={set(t){document.querySelector('#stp_cool b').textContent=t}};
     const k=el.dataset.k;
     const idx2val=i=>k==='encdet'?i+1:i;
     initStepper(el,{
-      bump(d){
+      // ‹ › 是相对增量：先把本地缓存刷成设备的真值再算目标，否则另一台电脑刚改过时
+      // 我们会踩在陈旧基准上（本地以为 0，实际已是 3，按一下就退回 1 而不是 4）
+      async bump(d){
+        const fresh=await api.get_device_settings();
+        if(fresh)DEV=fresh;
         if(!DEV)return null;const l=devLists(k);if(!l.length)return null;
         const i=(devIndex(k)+d+l.length)%l.length;
         apply({[k]:idx2val(i)});return l[i]},
@@ -640,26 +653,32 @@ const stCool={set(t){document.querySelector('#stp_cool b').textContent=t}};
   $('btnplay').onclick=()=>{apply({play:1});toast('试听中……')};
   $('btnvib').onclick=()=>{apply({vibtest:1});toast('试震中……')};
 
-  // 轮询：状态 1s；设备设置在线时每 10s（应用中跳过，避免回读打架）
+  // 轮询：状态每秒（只读桥接进程内存，不碰设备）；设备数据 30s 一次且仅窗口可见时。
+  // 设备一次只服务一个 HTTP 请求、实测吞吐 2~3 req/s，面板藏在托盘里还照样打设备
+  // 是纯浪费——多台电脑一起连时这点预算要留给转发。
   const st0=await api.get_state();cfgPoll=st0.poll_s;cfgCool=st0.cooldown_s;
   if(st0.platform==='mac')$('btnmin').style.display='none';  // 无边框 Cocoa 窗最小化不可用
   renderState(st0);
+  const PANEL_POLL_MS=Math.max(10,st0.panel_poll_s||30)*1000;
   let wasOnline=false,lastPull=0;
   async function tick(){
     try{
       const st=await api.get_state();renderState(st);
       const now=Date.now();
-      if(st.online&&!applying&&(!wasOnline||now-lastPull>10000)){
+      const visible=document.visibilityState!=='hidden';
+      if(st.online&&!applying&&visible&&(!wasOnline||now-lastPull>PANEL_POLL_MS)){
         lastPull=now;
-        const s=await api.get_device_settings();
-        if(!applying)renderDev(s);
-        renderNotes(await api.get_notes());
+        const p=await api.get_panel();          // 设置 + 最近通知，一次请求拿完
+        if(p&&!applying){renderDev(p.settings);renderNotes(p.notes)}
       }
       if(!st.online){renderDev(null);renderNotes(null)}
       wasOnline=st.online;
     }catch(e){/* 桥还没就绪，下秒再试 */}
     setTimeout(tick,1000);
   }
+  // 窗口重新显示时立刻补一次回读（藏起来期间设备可能被别的电脑改过）
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState!=='hidden')lastPull=0});
   tick();
 })();
 </script>

@@ -61,7 +61,7 @@ app = BUNDLE(
         "LSUIElement": True,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
-        "CFBundleShortVersionString": "2.0.1",
+        "CFBundleShortVersionString": "2.2.0",
         "NSHumanReadableCopyright": "AgentBell",
     },
 )

@@ -41,7 +41,7 @@ struct Note;
 struct ListAnim;
 struct SetMeta;
 enum SubMenu { SUB_NONE, SUB_MELODY };                          // 选项子列表（当前仅提示音用竖列表）
-enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE, SET_AUTOOFF, SET_AUTOPWR, SET_PWRMODE };  // 滑块设置项（定义在顶部，供自动原型引用）
+enum SetId   { SET_BUZVOL, SET_VIBVOL, SET_FBMODE, SET_FBVOL, SET_FBVIB, SET_ENCSENS, SET_LSTYLE, SET_RSTYLE, SET_AUTOOFF, SET_AUTOPWR };  // 滑块设置项（定义在顶部，供自动原型引用）
 
 // ===== 硬件引脚（ESP32-C3 SuperMini，全部避开 strapping 脚 2/8/9）=====
 #define OLED_SDA   5      // I2C 数据
@@ -359,14 +359,13 @@ int  rightStyle    = 1;       // 待机屏右半模块索引
 // —— 省电：闲置多久自动熄屏 / 自动关机（0=不启用）。计时基准见 lastActivity() ——
 int  autoOffMin    = 0;       // 无通知且无操作 N 分钟后熄屏（0=关闭）
 int  autoPwrMin    = 0;       // 无通知且无操作 N 分钟后关机（0=关闭）
-// —— 电源模式：板上没有 USB 检测脚也没有电池 ADC，固件无法自知供电来源，故给出显式选择 ——
-//   0=自动：默认按「性能」跑；一旦发生过掉电复位就永久转「省电」（记 NVS，换电池也记得）
-//   1=性能：满发射功率 + 不休眠 + 160MHz，通知最快，适合插着 USB
-//   2=省电：按信号强度选发射功率 + 调制解调器休眠 + 80MHz + 通知音量封顶，适合电池
-int  powerProfile  = 0;
-static const char* PWRMODE_OPTS[] = {"自动", "性能", "省电"};
-bool nvsBrownout   = false;   // 历史上是否掉电过（NVS，断电也不丢；用于「自动」判定）
-int  effPowerMode  = 1;       // 当前实际生效的模式（1=性能 2=省电，供界面显示）
+// —— 电源：只有一档「省电但够用」，没有模式选择 ——
+// 板上没有 USB 检测脚也没有电池 ADC，固件无法自知供电来源，所以一律按电池的约束跑：
+//   · CPU 80MHz + WiFi 调制解调器休眠：省下的连续电流（~60mA）是续航的大头
+//   · 发射功率按信号强度自适应，但弱信号时不吝啬——重传比多发几个 dBm 更费电，
+//     也更容易撞穿电脑侧的请求超时（实测弱信号下的重传会把延迟拖到 2 秒以上）
+//   · 通知响铃/震动封顶：蜂鸣 ~200mA + 马达 ~100mA 会和 WiFi 收包峰值叠在一起，
+//     正好是刚收到通知那一刻，小电池带不动就会当场掉电重启
 static const int AUTOOFF_MIN_OPTS[] = {0, 1, 2, 5, 10, 20, 30};        // 熄屏可选分钟
 static const int AUTOPWR_MIN_OPTS[] = {0, 10, 20, 30, 60, 120, 240};   // 关机可选分钟
 static const char* AUTOOFF_OPTS[] = {"关闭", "1 分钟", "2 分钟", "5 分钟", "10 分钟", "20 分钟", "30 分钟"};
@@ -383,9 +382,32 @@ static void paneAstro(int x0);     static void paneClock(int x0);
 static void paneAnalog(int x0);    static void paneBigTime(int x0);
 static void paneCalendar(int x0);  static void paneInfo(int x0);
 static void paneRadar(int x0);     static void paneMeteor(int x0);
-static const char* PANE_NAMES[] = {"宇航员", "数字时钟", "模拟表盘", "竖排大钟", "日历", "信息面板", "雷达扫描", "流星夜空"};
-static void (* const PANE_FNS[])(int) = {paneAstro, paneClock, paneAnalog, paneBigTime, paneCalendar, paneInfo, paneRadar, paneMeteor};
+static void paneFlip(int x0);      static void paneHeat(int x0);
+static void paneToday(int x0);     static void paneSignal(int x0);
+static void panePower(int x0);     static void paneMoon(int x0);
+static const char* PANE_NAMES[] = {"宇航员", "数字时钟", "模拟表盘", "竖排大钟", "日历", "信息面板", "雷达扫描", "流星夜空",
+                                   "翻页钟", "今日热力", "今日计数", "信号折线", "电源面板", "月相"};
+static void (* const PANE_FNS[])(int) = {paneAstro, paneClock, paneAnalog, paneBigTime, paneCalendar, paneInfo, paneRadar, paneMeteor,
+                                         paneFlip, paneHeat, paneToday, paneSignal, panePower, paneMoon};
 static const int PANE_N = sizeof(PANE_NAMES) / sizeof(PANE_NAMES[0]);
+
+// ===== 统计数据（给「今日热力 / 今日计数」控件）=====
+// 存 RTC 内存：复位、深睡「关机」、掉电重启都不丢（真断电才清）。另外每 30 分钟
+// 落一次 NVS，断电最多损失半小时的计数；昨日总数在跨日时写入。
+#ifndef RTC_DATA_ATTR
+  #define RTC_DATA_ATTR
+#endif
+RTC_DATA_ATTR uint16_t statHour[24] = {0};   // 今天每小时的通知数
+RTC_DATA_ATTR uint16_t statToday = 0;        // 今天总数
+RTC_DATA_ATTR uint16_t statYesterday = 0;    // 昨天总数（用于对比箭头）
+RTC_DATA_ATTR int16_t  statYday = -1;        // 记录归属的 tm_yday，用于跨日翻页
+bool statDirty = false;                      // 有未落盘的变动
+
+// ===== 信号折线历史 =====
+static const int RSSI_N = 60;                // 最近 60 个采样点（1s 一个 = 1 分钟）
+int8_t rssiHist[RSSI_N];
+int    rssiCount = 0;                        // 已填充数量（<RSSI_N 时左侧留空）
+int    curTxDbm = 0;                         // 当前发射功率（电源面板显示，applyPowerProfile 里更新）
 bool screenOff   = false;         // 屏幕是否熄灭（运行时，不持久）
 bool notifyWakes = true;          // 熄屏时来通知是否自动亮屏
 
@@ -410,8 +432,16 @@ SetId curSet = SET_BUZVOL;        // 当前正在调的滑块设置项
 int   mainSel = 0, subSel = 0;    // 主列表 / 子列表当前选中项
 unsigned long lastInput = 0;      // 最近交互（15s 回待机）
 unsigned long lastNoteAt = 0;     // 最近收到通知的时刻（自动熄屏/关机计时用）
-// 自动熄屏/关机的计时基准：通知与操作取较晚者——正在转旋钮时绝不会突然黑屏或关机
-static unsigned long lastActivity() { return lastNoteAt > lastInput ? lastNoteAt : lastInput; }
+unsigned long lastNetAt = 0;      // 最近一次被电脑访问（HTTP）的时刻
+// 自动熄屏/关机的计时基准：通知、操作、被电脑访问三者取最晚。
+// 有电脑在轮询它就不算闲置——否则桥接程序每 20s 探活也留不住设备，
+// 安静两小时后设备自己深睡关机、彻底从网上消失，只能手动转旋钮唤回。
+static unsigned long lastActivity() {
+  unsigned long t = lastNoteAt > lastInput ? lastNoteAt : lastInput;
+  return t > lastNetAt ? t : lastNetAt;
+}
+// 每个 HTTP handler 开头调一次：被电脑访问过就不算闲置
+static inline void netTouch() { lastNetAt = millis(); }
 unsigned long melSettleAt = 0;    // 提示音停留自动试听计时
 int   melPreviewed = -1;
 struct ListAnim { float top, sel; };
@@ -436,7 +466,7 @@ DNSServer dnsServer;              // 强制门户：所有域名都解析到设�
 //  循环，掉线后会把 loop 饿到几百毫秒都跑不了一轮 —— 表现就是旋钮失灵、蜂鸣器
 //  卡在发声段变成间歇长鸣。改成「安静等待 + 定时试一次」，CPU 大部分时间归 UI。
 // ============================================================================
-static const unsigned long WIFI_RETRY_MS    = 15000;  // 掉线后重试间隔起点
+static const unsigned long WIFI_RETRY_MS    = 2000;   // 掉线后重试间隔起点（翻倍退避到上限）
 static const unsigned long WIFI_BACKOFF_MAX = 60000;  // 退避上限
 bool wifiWasUp = false;             // 上一轮是否在线（检测掉线/恢复边沿）
 bool serverUp = false;              // server.begin() 是否已调用过（服务一直监听，不随掉线开关）
@@ -490,8 +520,13 @@ static void loadSettings() {
   rightStyle    = prefs.getInt("rsty", 1);   if (rightStyle < 0 || rightStyle >= PANE_N) rightStyle = 1;
   autoOffMin    = prefs.getInt("aoff", 0);   if (autoIdx(AUTOOFF_MIN_OPTS, autoOffMin) == 0) autoOffMin = 0;   // 非法值归零=关闭
   autoPwrMin    = prefs.getInt("apwr", 0);   if (autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin) == 0) autoPwrMin = 0;
-  powerProfile  = prefs.getInt("pwr", 0);    if (powerProfile < 0 || powerProfile > 2) powerProfile = 0;
-  nvsBrownout   = prefs.getBool("bo", false);   // 历史掉电标记（断电也不丢）
+  // 统计：RTC 内存没值（真断电过）才从 NVS 读回，否则以 RTC 里的实时值为准
+  if (statYday < 0) {
+    statYesterday = (uint16_t)prefs.getUInt("sty", 0);
+    statToday     = (uint16_t)prefs.getUInt("stt", 0);
+    statYday      = (int16_t)prefs.getInt("styd", -1);
+    if (prefs.getBytesLength("sth") == sizeof(statHour)) prefs.getBytes("sth", statHour, sizeof(statHour));
+  }
   prefs.end();
   buzzer.setVolume(buzzerVol);
   vibrator.setVolume(vibVol);
@@ -514,7 +549,19 @@ static void saveSettings() {
   prefs.putInt("rsty", rightStyle);
   prefs.putInt("aoff", autoOffMin);
   prefs.putInt("apwr", autoPwrMin);
-  prefs.putInt("pwr", powerProfile);
+  prefs.end();
+}
+
+// 统计落盘：每 30 分钟一次（有变动才写），断电最多损失半小时计数。
+// 写得这么稀是为了省 flash 擦写寿命 —— 统计数据丢一点无关紧要。
+static void saveStats() {
+  if (!statDirty) return;
+  statDirty = false;
+  prefs.begin("agentbell", false);
+  prefs.putUInt("stt", statToday);
+  prefs.putUInt("sty", statYesterday);
+  prefs.putInt("styd", statYday);
+  prefs.putBytes("sth", statHour, sizeof(statHour));
   prefs.end();
 }
 #endif
@@ -534,40 +581,32 @@ static const int LOWPWR_VOL_CAP = 70;      // 省电模式下通知蜂鸣/震动
 
 #ifndef SIM_DEMO
 static void applyPowerProfile() {
-  // 「自动」= 没掉电过就按性能跑，掉过就转省电（本次 RTC 计数或历史 NVS 标记任一为真）
-  bool saver = (powerProfile == 2) ||
-               (powerProfile == 0 && (brownoutSeen > 0 || nvsBrownout));
-  effPowerMode = saver ? 2 : 1;
-
-  if (!saver) {
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    WiFi.setSleep(false);                  // 不休眠 → 通知最快
-    setCpuFrequencyMhz(160);
-    Serial.println("[power] 性能模式：TX 19.5dBm · 不休眠 · 160MHz");
-    return;
-  }
-
-  // 省电：发射功率按信号强度分档（够用就好，不浪费在峰值电流上）
+  // 只有一档。省在真正耗电的地方（射频常开 + 主频），不省在会让任务失败的地方。
+  // 发射功率按实测 RSSI 自适应：弱信号时宁可多发几个 dBm，也别让 TCP 重传把请求
+  // 延迟拖过电脑侧的超时（实测重传尾巴能到 2.3 秒）—— 重传本身也比多发几个 dBm 更费电。
   int rssi = (WiFi.status() == WL_CONNECTED) ? (int)WiFi.RSSI() : -80;
   wifi_power_t tx;
   const char* txName;
-  if (rssi > -55)      { tx = WIFI_POWER_11dBm; txName = "11dBm"; }   // 信号很强，压到底
-  else if (rssi > -68) { tx = WIFI_POWER_13dBm; txName = "13dBm"; }
-  else                 { tx = WIFI_POWER_15dBm; txName = "15dBm"; }   // 信号弱，保连接优先
-  WiFi.setTxPower(tx);
-  WiFi.setSleep(WIFI_PS_MIN_MODEM);        // 随 DTIM 醒来收包，通知延迟 +100ms 量级
-  setCpuFrequencyMhz(80);
-  Serial.printf("[power] 省电模式：TX %s（RSSI %d）· 调制解调器休眠 · 80MHz\n", txName, rssi);
+  if (rssi > -50)      { tx = WIFI_POWER_11dBm; txName = "11dBm"; curTxDbm = 11; }  // 贴着路由器
+  else if (rssi > -60) { tx = WIFI_POWER_13dBm; txName = "13dBm"; curTxDbm = 13; }
+  else if (rssi > -70) { tx = WIFI_POWER_15dBm; txName = "15dBm"; curTxDbm = 15; }  // 常态
+  else                 { tx = WIFI_POWER_17dBm; txName = "17dBm"; curTxDbm = 17; }  // 信号弱，保连接
+  // 档位没变就不下发：每分钟无条件重设 esp_wifi_set_ps / set_max_tx_power 是无谓扰动
+  static int lastTxDbm = -1;
+  static bool psApplied = false;
+  if (curTxDbm != lastTxDbm) {
+    lastTxDbm = curTxDbm;
+    WiFi.setTxPower(tx);
+    Serial.printf("[power] TX %s（RSSI %d）· 调制解调器休眠 · 80MHz\n", txName, rssi);
+  }
+  if (!psApplied) {
+    psApplied = true;
+    WiFi.setSleep(WIFI_PS_MIN_MODEM);      // 随 DTIM 醒来收包：省 ~60mA，代价约 +0.1s 延迟
+    setCpuFrequencyMhz(80);
+  }
 }
 
 // 记下「掉电过」这件事：写 NVS，换电池/断电也不忘，「自动」模式据此长期转省电
-static void markBrownoutSticky() {
-  if (nvsBrownout) return;
-  nvsBrownout = true;
-  prefs.begin("agentbell", false);
-  prefs.putBool("bo", true);
-  prefs.end();
-}
 #endif  // !SIM_DEMO
 
 // 亮屏 / 熄屏（SSD1306 省电指令）
@@ -602,6 +641,7 @@ static void powerOff() {
 
 #ifndef SIM_DEMO
   saveSettings();                          // 设置落盘（NVS）
+  saveStats();                             // 今日统计也落盘，深睡不丢
   server.stop();
   WiFi.disconnect(true);                   // 断开并关 WiFi 射频
   WiFi.mode(WIFI_OFF);
@@ -639,14 +679,20 @@ void fireAlert(const Note& n) {
   if (uiState == UI_SLIDER) saveSettings();       // 通知顶掉滑块/样式选择页前，先把已改的值存盘
 #endif
   addNote(n);
+  statCountNote();                                 // 计入今日统计（热力/计数控件用）
   lastNoteAt = millis();                          // 自动熄屏/关机的计时重新起算
   uiState = UI_NOTE;                              // 通知打断任何界面
-  // 省电模式给通知响铃/震动封顶：蜂鸣 ~200mA + 马达 ~100mA 会和 WiFi 收包峰值叠在
+  // 响铃/震动封顶（防掉电，不是为了省电）：蜂鸣 ~200mA + 马达 ~100mA 会和 WiFi 收包峰值叠在
   // 一起，正好是刚收到通知那一刻 —— 电池带不动就会当场掉电重启。
-  int aVol = (effPowerMode == 2 && buzzerVol > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
-  int aVib = (effPowerMode == 2 && vibVol    > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
-  if (!dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len, aVol);
-  if (!dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]), aVib);
+  int aVol = (buzzerVol > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
+  int aVib = (vibVol    > LOWPWR_VOL_CAP) ? LOWPWR_VOL_CAP : -1;
+  // 响铃冷却（设备侧）：多台电脑各有自己的冷却、互不知情，两条通知撞在提示音
+  // 时长内会把前一段从头打断，只听到一声残缺的音。这里 1.2 秒内只更新屏幕不重放。
+  static unsigned long lastRingAt = 0;
+  bool ringOk = (lastRingAt == 0) || (millis() - lastRingAt > 1200);
+  if (ringOk) lastRingAt = millis();
+  if (ringOk && !dnd && buzzerEnabled) buzzer.play(MELODIES[alertTone].seq, MELODIES[alertTone].len, aVol);
+  if (ringOk && !dnd && vibEnabled)    vibrator.trigger(ALERT_VIB, sizeof(ALERT_VIB) / sizeof(ALERT_VIB[0]), aVib);
   if (screenOff && notifyWakes) setScreen(true);   // 熄屏时按设置决定是否自动亮屏
   needRender = true;
   Serial.printf("[notify] %s / %s / %s\n", n.computer, n.agent, n.conversation);
@@ -702,6 +748,30 @@ static bool clockNow(struct tm& t) {
   if (now < 1609459200) return false;    // < 2021-01-01 视为未同步
   t = *localtime(&now);
   return true;
+}
+
+// ============================================================================
+//  通知统计记账：跨日翻页 + 按小时累加（供「今日热力 / 今日计数」）
+// ----------------------------------------------------------------------------
+//  时钟未同步时不记账（宁可少记，也不要把数记到错误的小时里）。
+// ============================================================================
+static void statRollIfNeeded(const struct tm& t) {
+  if (statYday == t.tm_yday) return;
+  // 跨日：今天的总数变成"昨天"。首次开机（statYday<0）不动昨日值，用 NVS 读回的。
+  if (statYday >= 0) statYesterday = statToday;
+  statToday = 0;
+  for (int i = 0; i < 24; i++) statHour[i] = 0;
+  statYday = t.tm_yday;
+  statDirty = true;
+}
+
+static void statCountNote() {
+  struct tm t;
+  if (!clockNow(t)) return;              // 时钟没同步，这条不记账
+  statRollIfNeeded(t);
+  if (statHour[t.tm_hour] < 0xFFFF) statHour[t.tm_hour]++;
+  if (statToday < 0xFFFF) statToday++;
+  statDirty = true;
 }
 
 static bool netOnline() {
@@ -883,6 +953,301 @@ static void paneMeteor(int x0) {
   }
 }
 
+// ============================================================================
+//  第二批半屏模块（2026-08-05）
+//  共用视觉语言：顶部 6px 小字标签 + 一条细线（卡片头）→ 一个主视觉 → 底部一行注解。
+//  单色屏没有灰度，"半调灰"靠 50% 棋盘格点阵实现（fillDither）。
+//  预览一致性：SIM 只替换「数据来源」，布局与真机是同一份代码，所见即所得。
+// ============================================================================
+#define FONT_TINY u8g2_font_4x6_tr        // 标签/注解用超小拉丁字体（4×6 像素）
+
+// 半屏顶部标签：小字 + 下方细线
+static void paneLabel(int x0, const char* s) {
+  u8g2.setFont(FONT_TINY);
+  u8g2.drawStr(x0 + 4, 7, s);
+  u8g2.drawHLine(x0 + 4, 10, PANE - 8);
+}
+
+// 右对齐小字（多个模块要在右上/右下角标注量级）
+static void tinyRight(int x0, int y, const char* s) {
+  u8g2.setFont(FONT_TINY);
+  u8g2.drawStr(x0 + PANE - 4 - u8g2.getStrWidth(s), y, s);
+}
+
+// 50% 棋盘格：单色屏的半调灰，用于阴影和次级填充
+static void fillDither(int x, int y, int w, int h) {
+  for (int j = 0; j < h; j++)
+    for (int i = (j & 1); i < w; i += 2)
+      u8g2.drawPixel(x + i, y + j);
+}
+
+// —— 数据取用（SIM 给假值，真机取实值；布局代码只有一份）——
+static int paneRssi() {
+#ifndef SIM_DEMO
+  return (WiFi.status() == WL_CONNECTED) ? (int)WiFi.RSSI() : 0;   // 0=离线
+#else
+  return -58;
+#endif
+}
+static int paneTxDbm() {
+#ifndef SIM_DEMO
+  return curTxDbm;
+#else
+  return 20;
+#endif
+}
+static int paneCpuMhz() {
+#ifndef SIM_DEMO
+  return (int)getCpuFrequencyMhz();
+#else
+  return 160;
+#endif
+}
+static int paneBrownout() {
+#ifndef SIM_DEMO
+  return brownoutSeen;
+#else
+  return 0;
+#endif
+}
+
+// —— 模块 8：翻页钟 —— 仿机械翻页牌：时/分两张卡片 + 中缝 + 分钟跳变时翻盖动画 ——
+// 卡片 48×25（上 y=4、下 y=34）；logisoso20 数字基线 cy+22（字高 20，卡内上下各留 2px）。
+static void paneFlip(int x0) {
+  struct tm t;
+  bool has = clockNow(t);
+  int hh = has ? t.tm_hour : 0, mm = has ? t.tm_min : 0;
+
+  static int lastMin = -1;
+  static unsigned long flipAt = 0;
+  if (has && mm != lastMin) { lastMin = mm; flipAt = millis(); }
+  unsigned long el = millis() - flipAt;
+  bool flipping = has && el < 420;
+
+  const int cw = 48, ch = 25, cx = x0 + (PANE - cw) / 2;
+  char buf[4];
+  for (int card = 0; card < 2; card++) {
+    int cy = card == 0 ? 4 : 34;
+    if (has) snprintf(buf, sizeof(buf), "%02d", card == 0 ? hh : mm);
+    else     strlcpy(buf, "--", sizeof(buf));
+
+    u8g2.drawRFrame(cx, cy, cw, ch, 3);              // 卡片
+    fillDither(cx + 2, cy + ch - 3, cw - 4, 2);      // 卡底阴影 → 厚度感
+    u8g2.setFont(FONT_CLOCK);
+    u8g2.drawStr(cx + (cw - u8g2.getStrWidth(buf)) / 2, cy + 22, buf);
+    u8g2.drawHLine(cx + 1, cy + ch / 2, cw - 2);     // 中缝（翻页牌对折线）
+
+    // 分钟卡翻盖：上半格盖板高度 12→0 落下（XOR 画，压在数字上也看得见）
+    if (card == 1 && flipping) {
+      int h = 12 - (int)(el * 12 / 420);
+      if (h > 0) {
+        u8g2.setDrawColor(2);
+        u8g2.drawBox(cx + 1, cy + 1, cw - 2, h);
+        u8g2.setDrawColor(1);
+        u8g2.drawHLine(cx + 1, cy + 1 + h, cw - 2);  // 盖板下沿
+      }
+    }
+  }
+  u8g2.drawBox(cx - 2, 30, 3, 3);                    // 两卡之间的转轴
+  u8g2.drawBox(cx + cw - 1, 30, 3, 3);
+}
+
+// —— 模块 9：今日热力 —— 按 3 小时合并成 8 根宽柱，比 24 根细柱清楚得多 ——
+// 取舍：牺牲小时级精度换可读性（64px 宽里 24 根柱每根只有 2px，眼睛分不出高低）。
+static void paneHeat(int x0) {
+  paneLabel(x0, "TODAY");
+  struct tm t;
+  bool has = clockNow(t);
+  int nowB = has ? t.tm_hour / 3 : -1;              // 当前所在的 3 小时段
+
+  uint16_t bucket[8] = {0}, peak = 0;
+  for (int i = 0; i < 24; i++) bucket[i / 3] += statHour[i];
+  for (int i = 0; i < 8; i++) if (bucket[i] > peak) peak = bucket[i];
+
+  const int bw = 5, gap = 2, bx = x0 + 5;           // 8 根 × (5+2) − 2 = 54px
+  const int by = 52, bh = 28;                       // 柱区 y 24..52
+  uint16_t norm = peak ? peak : 1;
+  for (int i = 0; i < 8; i++) {
+    int x = bx + i * (bw + gap);
+    int h = (int)((uint32_t)bucket[i] * bh / norm);
+    if (h > 0) u8g2.drawBox(x, by - h, bw, h);
+    else       u8g2.drawHLine(x, by - 1, bw);        // 空段留一条底边，节奏不断
+    if (i == nowB) {                                 // 当前段：柱上方三角游标
+      u8g2.drawPixel(x + bw / 2, by - bh - 5);
+      u8g2.drawHLine(x + bw / 2 - 1, by - bh - 4, 3);
+      u8g2.drawHLine(x + bw / 2 - 2, by - bh - 3, 5);
+    }
+  }
+  u8g2.drawHLine(bx - 1, by + 1, 56);                // 基线
+  u8g2.setFont(FONT_TINY);                           // 只标 4 个时刻，够定位
+  u8g2.drawStr(bx - 1, by + 8, "0");
+  u8g2.drawStr(bx + 2 * (bw + gap) - 1, by + 8, "6");
+  u8g2.drawStr(bx + 4 * (bw + gap) - 2, by + 8, "12");
+  u8g2.drawStr(bx + 6 * (bw + gap) - 2, by + 8, "18");
+  char l[10];
+  snprintf(l, sizeof(l), "%u", (unsigned)peak);      // 纵轴量级（峰值段的条数）
+  tinyRight(x0, 17, l);
+  if (peak == 0) {
+    u8g2.setFont(FONT_CN);
+    const char* s = has ? "今天还没有" : "等时钟同步";
+    u8g2.drawUTF8(x0 + (PANE - u8g2.getUTF8Width(s)) / 2, 38, s);
+  }
+}
+
+// —— 模块 10：今日计数 —— 超大数字 + 与昨天的对比箭头 ——
+static void paneToday(int x0) {
+  paneLabel(x0, "TODAY");
+  int cx = x0 + PANE / 2;
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%u", (unsigned)statToday);
+  u8g2.setFont(FONT_CLOCK_XL);                       // 26px 数字，基线 44
+  u8g2.drawStr(cx - u8g2.getStrWidth(buf) / 2, 44, buf);
+  u8g2.setFont(FONT_CN);
+  u8g2.drawUTF8(cx - u8g2.getUTF8Width("轮对话") / 2, 56, "轮对话");
+
+  // 底行（6px 小字）：箭头 + 昨日数值 + YDAY
+  const int dy = 63, ax = x0 + 5;
+  u8g2.setFont(FONT_TINY);
+  snprintf(buf, sizeof(buf), "%u", (unsigned)statYesterday);
+  u8g2.drawStr(ax + 9, dy, buf);
+  u8g2.drawStr(x0 + PANE - 4 - u8g2.getStrWidth("YDAY"), dy, "YDAY");
+  if (statToday > statYesterday) {                   // 上升
+    u8g2.drawVLine(ax + 3, dy - 5, 5);
+    u8g2.drawLine(ax + 1, dy - 3, ax + 3, dy - 5);
+    u8g2.drawLine(ax + 3, dy - 5, ax + 5, dy - 3);
+  } else if (statToday < statYesterday) {            // 下降
+    u8g2.drawVLine(ax + 3, dy - 5, 5);
+    u8g2.drawLine(ax + 1, dy - 2, ax + 3, dy);
+    u8g2.drawLine(ax + 3, dy, ax + 5, dy - 2);
+  } else {                                           // 持平
+    u8g2.drawHLine(ax + 1, dy - 2, 5);
+  }
+}
+
+// —— 模块 11：信号折线 —— 大字当前值当主角 + 下方 15 根粗柱看趋势 ——
+// 取舍：1px 折线 + 60 个采样点在 OLED 上几乎看不清，改成「大数字 + 少量宽柱」。
+static void paneSignal(int x0) {
+  paneLabel(x0, "RSSI");
+#ifdef SIM_DEMO
+  static bool fake = false;                          // 预览：合成起伏，便于评估观感
+  if (!fake) {
+    fake = true;
+    for (int i = 0; i < RSSI_N; i++)
+      rssiHist[i] = (int8_t)(-58 + (int)(11 * sinf(i * 0.32f)) - (i % 9 == 0 ? 5 : 0));
+    rssiCount = RSSI_N;
+  }
+#endif
+  // 主角：当前值大字（logisoso20 含负号）+ dBm 小字
+  int cur = paneRssi();
+  char big[8];
+  if (cur) snprintf(big, sizeof(big), "%d", cur);
+  else     strlcpy(big, "--", sizeof(big));
+  u8g2.setFont(FONT_CLOCK);
+  int bwid = u8g2.getStrWidth(big);
+  u8g2.drawStr(x0 + 5, 34, big);
+  u8g2.setFont(FONT_TINY);
+  u8g2.drawStr(x0 + 7 + bwid, 34, cur ? "dBm" : "OFF");
+
+  // 趋势：60 个采样合并成 13 根柱（每柱约 4.6s 均值），柱宽 3px + 1px 间隔
+  const int NB = 13, bw = 3, by = 55, bh = 15;       // 柱区 y 40..55（底部给注解留位）
+  const int lo = -90, hi = -40;                      // 柱高映射区间（常用范围，放大差异）
+  for (int b = 0; b < NB; b++) {
+    int sum = 0, n = 0;
+    for (int i = b * RSSI_N / NB; i < (b + 1) * RSSI_N / NB && i < rssiCount; i++)
+      if (rssiHist[i]) { sum += rssiHist[i]; n++; }
+    int x = x0 + 5 + b * (bw + 1);
+    if (!n) { u8g2.drawPixel(x + 1, by - 1); continue; }   // 无数据：留个点
+    int v = sum / n;
+    if (v > hi) v = hi;
+    if (v < lo) v = lo;
+    int h = (v - lo) * bh / (hi - lo);
+    if (h < 1) h = 1;
+    u8g2.drawBox(x, by - h, bw, h);
+  }
+  u8g2.drawHLine(x0 + 4, by + 1, 53);                // 基线
+  u8g2.setFont(FONT_TINY);
+  u8g2.drawStr(x0 + 4, 63, "1min");
+  tinyRight(x0, 63, "-40/-90");                      // 柱高对应的上下界
+}
+
+// —— 模块 12：电源面板 —— 发射功率/主频/休眠 + 供电状态（电池供电时的仪表）——
+static void panePower(int x0) {
+  paneLabel(x0, "POWER");
+  char l[24];
+
+  // 发射功率是这块面板唯一会变的量（按 RSSI 自适应），给它最大的字号
+  u8g2.setFont(FONT_CN);
+  snprintf(l, sizeof(l), "%d dBm", paneTxDbm());
+  int mw = u8g2.getUTF8Width(l) + 8;
+  u8g2.drawRFrame(x0 + 4, 14, mw, 15, 3);
+  u8g2.drawUTF8(x0 + 8, 26, l);
+
+  // 小字双栏：主频 + 休眠策略（一档到底，恒为 PS MIN）
+  u8g2.setFont(FONT_TINY);
+  snprintf(l, sizeof(l), "CPU %d", paneCpuMhz());
+  u8g2.drawStr(x0 + 5, 38, l);
+  u8g2.drawStr(x0 + 36, 38, "PS MIN");
+  u8g2.drawHLine(x0 + 4, 41, PANE - 8);
+
+  int bo = paneBrownout();
+  u8g2.setFont(FONT_CN);
+  if (bo > 0) {
+    u8g2.drawUTF8(x0 + 4, 54, "电压不足");
+    u8g2.setFont(FONT_TINY);
+    snprintf(l, sizeof(l), "BROWNOUT x%d", bo);
+    u8g2.drawStr(x0 + 5, 63, l);
+    u8g2.drawFrame(x0 + PANE - 11, 45, 7, 11);       // 右侧警示「!」
+    u8g2.drawVLine(x0 + PANE - 8, 47, 5);
+    u8g2.drawPixel(x0 + PANE - 8, 54);
+  } else {
+    u8g2.drawUTF8(x0 + 4, 54, "供电正常");
+    unsigned long up = millis() / 60000UL;
+    u8g2.setFont(FONT_TINY);
+    if (up < 60) snprintf(l, sizeof(l), "UP %lum", up);
+    else         snprintf(l, sizeof(l), "UP %luh%lum", up / 60, up % 60);
+    u8g2.drawStr(x0 + 5, 63, l);
+  }
+}
+
+// —— 模块 13：月相 —— 按朔望月周期推算真实月相 + 相位名 + 月龄 ——
+static void paneMoon(int x0) {
+  paneLabel(x0, "MOON");
+  const int cx = x0 + PANE / 2, cy = 33, r = 15;   // 月轮 y 18..48，给下方文字留位
+  struct tm t;
+  bool has = clockNow(t);
+
+  float age = 14.8f;                               // 未同步时给满月，画面不空
+  if (has) {
+    // 基准：2000-01-06 18:14 UTC 那次新月；朔望月 29.530588 天
+    double days = (double)time(nullptr) / 86400.0 - 10957.76;
+    double ph = fmod(days, 29.530588);
+    if (ph < 0) ph += 29.530588;
+    age = (float)ph;
+  }
+  float frac = age / 29.530588f;                   // 0 新月 · 0.5 满月
+  float k = cosf(frac * 2 * PI);                   // +1 新月 → -1 满月
+
+  u8g2.drawCircle(cx, cy, r);
+  for (int dy = -r + 1; dy < r; dy++) {            // 逐行填亮部（终结线是椭圆）
+    int halfW = (int)sqrtf((float)(r * r - dy * dy));
+    int edge = (int)(halfW * k);
+    int xa, xb;
+    if (frac < 0.5f) { xa = cx + edge; xb = cx + halfW; }   // 上弦：右侧亮
+    else             { xa = cx - halfW; xb = cx + edge; }    // 下弦：左侧亮
+    if (xb > xa) u8g2.drawHLine(xa, cy + dy, xb - xa);
+  }
+  if (age < 1.5f || age > 28.0f)                   // 近新月：暗面点阵勾形，别整个消失
+    fillDither(cx - r + 3, cy - r + 3, r * 2 - 6, r * 2 - 6);
+
+  static const char* PHASE[] = {"新月", "娥眉月", "上弦月", "盈凸月",
+                                "满月", "亏凸月", "下弦月", "残月"};
+  u8g2.setFont(FONT_CN);
+  const char* nm = has ? PHASE[(int)(frac * 8 + 0.5f) % 8] : "月相";
+  u8g2.drawUTF8(cx - u8g2.getUTF8Width(nm) / 2, 62, nm);
+  char l[10]; snprintf(l, sizeof(l), "D%d", (int)(age + 0.5f));
+  tinyRight(x0, 17, l);
+}
+
 // 待机屏 = 左右两个半屏模块各自渲染（不画分隔线，模块自身留白即边界）
 static void renderIdlePanes() {
   PANE_FNS[leftStyle](0);
@@ -981,7 +1346,7 @@ static void renderNote(const Note* n) {
 // 勿扰和旋钮方向是开关项：短按直接切换，名字里带当前状态。
 enum MainId { MI_DND, MI_TONE, MI_NVOL, MI_NVIB, MI_FBMODE, MI_FBVOL, MI_FBVIB,
               MI_LSTYLE, MI_RSTYLE, MI_ENCDIR, MI_ENCSENS,
-              MI_AUTOOFF, MI_AUTOPWR, MI_PWRMODE, MI_SCREENOFF, MI_POWEROFF,
+              MI_AUTOOFF, MI_AUTOPWR, MI_SCREENOFF, MI_POWEROFF,
               MI_WIFI, MI_REPROV, MI_SIMNOTE, MI_STATUS, MAIN_N_ };
 static const int MAIN_N = MAIN_N_;
 static const char* mainName(int i) {
@@ -1000,7 +1365,6 @@ static const char* mainName(int i) {
     case MI_ENCSENS: return "旋钮灵敏度";
     case MI_AUTOOFF: return "自动熄屏";
     case MI_AUTOPWR: return "自动关机";
-    case MI_PWRMODE: return "电源模式";
     case MI_SCREENOFF: return "立即熄屏";
     case MI_POWEROFF:  return "立即关机";
     case MI_WIFI:      return "WiFi 状态";
@@ -1062,7 +1426,6 @@ static SetMeta setMeta(SetId id) {
     case SET_RSTYLE: return {"右屏样式", false, PANE_NAMES, PANE_N};
     case SET_AUTOOFF: return {"自动熄屏", false, AUTOOFF_OPTS, AUTO_OPT_N};
     case SET_AUTOPWR: return {"自动关机", false, AUTOPWR_OPTS, AUTO_OPT_N};
-    case SET_PWRMODE: return {"电源模式", false, PWRMODE_OPTS, 3};
     default:         return {"旋钮灵敏度", false, ENCSENS_OPTS, 3};  // SET_ENCSENS
   }
 }
@@ -1075,7 +1438,6 @@ static int setGet(SetId id) {
     case SET_RSTYLE: return rightStyle;
     case SET_AUTOOFF: return autoIdx(AUTOOFF_MIN_OPTS, autoOffMin);
     case SET_AUTOPWR: return autoIdx(AUTOPWR_MIN_OPTS, autoPwrMin);
-    case SET_PWRMODE: return powerProfile;
     default:         return encDetents - 1;         // SET_ENCSENS
   }
 }
@@ -1090,11 +1452,6 @@ static void setPut(SetId id, int v) {
     case SET_RSTYLE: rightStyle = v; break;
     case SET_AUTOOFF: autoOffMin = AUTOOFF_MIN_OPTS[v]; break;
     case SET_AUTOPWR: autoPwrMin = AUTOPWR_MIN_OPTS[v]; break;
-    case SET_PWRMODE: powerProfile = v;
-#ifndef SIM_DEMO
-                      applyPowerProfile();       // 选完立刻生效
-#endif
-                      break;
     default:         encDetents = v + 1; break;      // SET_ENCSENS
   }
 }
@@ -1189,7 +1546,7 @@ static void renderPopup() {
   char l[44];
 #ifndef SIM_DEMO
   snprintf(l, sizeof(l), "IP %s", WiFi.localIP().toString().c_str());  u8g2.drawUTF8(3, 28, l);
-  snprintf(l, sizeof(l), "信号 %d dBm%s", (int)WiFi.RSSI(), lowPowerGuard ? " 省电" : "");
+  snprintf(l, sizeof(l), "信号 %d dBm · TX %d", (int)WiFi.RSSI(), curTxDbm);
   u8g2.drawUTF8(3, 41, l);
   snprintf(l, sizeof(l), "运行 %lu 秒", millis() / 1000);              u8g2.drawUTF8(3, 54, l);
   // 掉电诊断：非 0 就说明电池带不动峰值电流（正常供电下永远是 0）
@@ -1274,7 +1631,6 @@ static void menuActivate() {
     case MI_ENCSENS: enterSlider(SET_ENCSENS); break;
     case MI_AUTOOFF: enterSlider(SET_AUTOOFF); break;
     case MI_AUTOPWR: enterSlider(SET_AUTOPWR); break;
-    case MI_PWRMODE: enterSlider(SET_PWRMODE); break;
     case MI_SCREENOFF: setScreen(false); uiState = UI_IDLE; break;
     case MI_POWEROFF:  powerOff(); break;              // 深睡，转旋钮开机；真机不返回
     case MI_WIFI:                                      // WiFi 状态页：短按=立刻重连一次
@@ -1388,6 +1744,7 @@ static void argTo(const char* key, const char* dflt, char* out, size_t n) {
 }
 
 static void handleNotify() {   // 唯一保留的写入端点：给电脑侧 hook 用（所有设置已移到设备菜单）
+  netTouch();
   Note n{};
   argTo("computer",     "?",     n.computer,     sizeof(n.computer));
   argTo("agent",        "Agent", n.agent,        sizeof(n.agent));
@@ -1521,8 +1878,7 @@ opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
 <section><h2>POWER · 省电</h2>
  <div class=it><span>自动熄屏</span><select id=aoff aria-label=自动熄屏></select></div>
  <div class=it><span>自动关机</span><select id=apwr aria-label=自动关机></select></div>
- <div class=it><span>电源模式</span><select id=pwr aria-label=电源模式></select></div>
- <p class=hint id=pwrhint></p>
+ <p class=hint>设备恒按省电跑：按信号强度调发射功率 + 调制解调器休眠 + 80MHz + 通知音量封顶（通知延迟 +0.1 秒量级）。</p>
  <p class=hint>闲置计时从「最后一条通知」或「最后一次转旋钮」起算，取较晚者。自动关机后转动旋钮开机。</p>
 </section>
 <section><h2>ENCODER · 旋钮</h2>
@@ -1557,20 +1913,7 @@ function render(s){S=s;
  fill($('tone'),s.melodies,s.tone);fill($('fb'),FB,s.fb);fill($('encdet'),DET,s.encdet,1);
  fill($('lsty'),s.panes,s.lsty);fill($('rsty'),s.panes,s.rsty);
  fillPairs($('aoff'),AOFF,s.aoff);fillPairs($('apwr'),APWR,s.apwr);
- fill($('pwr'),['自动','性能','省电'],s.pwr);
- $('pwrhint').textContent=(s.effpwr==2
-  ?'当前按省电跑：降发射功率 + 调制解调器休眠 + 80MHz + 通知音量封顶（通知延迟 +0.1s 量级）。'
-  :'当前按性能跑：满发射功率、不休眠、160MHz，通知最快。')
-  +(s.pwr==0?'「自动」会在发生过掉电重启后永久转省电。':'')}
-function save(f){busy=1;
- fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-  body:new URLSearchParams(f)}).then(r=>r.json()).then(s=>{render(s);toast('已保存')})
- .catch(()=>toast('保存失败，请重试')).finally(()=>busy=0)}
-function act(k){save({[k]:1});ring()}
-function test(){fetch('/api/test').then(()=>{toast('已发送');ring()}).catch(()=>toast('发送失败'))}
-function ring(){const o=$('oled');o.classList.remove('ring');void o.offsetWidth;o.classList.add('ring')}
-['tone','fb','encdet','lsty','rsty','aoff','apwr','pwr'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).value}));
-['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).checked?1:0}));
+ ['buzz','vib','dnd','nwake','encrev'].forEach(k=>$(k).onchange=()=>save({[k]:$(k).checked?1:0}));
 ['bvol','vvol','fbvol','fbvib'].forEach(k=>{const r=$(k);
  r.oninput=()=>{r.style.setProperty('--p',r.value+'%');$('o'+k).value=r.value};
  r.onchange=()=>save({[k]:r.value})});
@@ -1595,6 +1938,7 @@ fetch('/api/settings').then(r=>r.json()).then(render);refresh();setInterval(refr
 </script>)HTML";
 
 static void handleRoot() {
+  netTouch();
   server.send_P(200, "text/html; charset=utf-8", CONSOLE_HTML);
 }
 
@@ -1608,7 +1952,7 @@ static void jsonEscapeTo(String& out, const char* s) {
     else out += (char)c;
   }
 }
-static void handleApiNotes() {
+static String notesJson() {
   String j;
   j.reserve(256 + ringCount * 200);
   j += "[";
@@ -1624,14 +1968,18 @@ static void handleApiNotes() {
     j += "\"}";
   }
   j += "]";
-  server.send(200, "application/json; charset=utf-8", j);
+  return j;
+}
+static void handleApiNotes() {
+  netTouch();
+  server.send(200, "application/json; charset=utf-8", notesJson());
 }
 
 // ============================================================================
 //  桥接 API（给电脑侧桥接程序用，JSON 用 String 拼接，不引 ArduinoJson）
 // ============================================================================
 // 设备身份：局域网扫描时靠它确认「这是 AgentBell」
-static void handleApiInfo() {
+static String infoJson() {
   String j = "{\"app\":\"agent-bell\",\"api\":1";
   j += ",\"name\":\"" + String(MDNS_NAME) + "\"";
   j += ",\"mac\":\"" + WiFi.macAddress() + "\"";
@@ -1639,10 +1987,12 @@ static void handleApiInfo() {
   j += ",\"rssi\":" + String(WiFi.RSSI());
   j += ",\"uptime_s\":" + String(millis() / 1000);
   j += ",\"brownouts\":" + String(brownoutSeen);            // 本次开机的连续掉电次数（正常供电恒为 0）
-  j += ",\"lowpower\":" + String(effPowerMode == 2 ? 1 : 0);  // 当前是否按省电跑（含历史掉电导致的）
-  j += ",\"bosticky\":" + String(nvsBrownout ? 1 : 0);        // 历史上掉过电（NVS，断电不丢）
   j += "}";
-  server.send(200, "application/json; charset=utf-8", j);
+  return j;
+}
+static void handleApiInfo() {
+  netTouch();
+  server.send(200, "application/json; charset=utf-8", infoJson());
 }
 
 // 当前全部运行时设置 → JSON（GET 与 POST 应答共用）
@@ -1666,8 +2016,6 @@ static String settingsJson() {
   j += ",\"rsty\":"  + String(rightStyle);
   j += ",\"aoff\":"  + String(autoOffMin);      // 自动熄屏（分钟，0=关闭）
   j += ",\"apwr\":"  + String(autoPwrMin);      // 自动关机（分钟，0=关闭）
-  j += ",\"pwr\":"   + String(powerProfile);    // 电源模式 0自动 1性能 2省电
-  j += ",\"effpwr\":" + String(effPowerMode);   // 实际生效 1性能 2省电（只读）
   j += ",\"melodies\":[";
   for (int i = 0; i < MEL_N; i++) {           // 固定常量名，无需 JSON 转义
     if (i) j += ",";
@@ -1695,6 +2043,7 @@ static int argClamp(const char* key, int cur, int lo, int hi) {
 
 // GET 读设置；POST 改设置（字段全部可选）+ 可选动作 play/vibtest
 static void handleApiSettings() {
+  netTouch();
   if (server.method() == HTTP_POST) {
     buzzerEnabled = argBool("buzz",   buzzerEnabled);
     vibEnabled    = argBool("vib",    vibEnabled);
@@ -1715,10 +2064,6 @@ static void handleApiSettings() {
       int v = server.arg("aoff").toInt();
       autoOffMin = AUTOOFF_MIN_OPTS[autoIdx(AUTOOFF_MIN_OPTS, v)];
     }
-    if (server.hasArg("pwr")) {
-      powerProfile = argClamp("pwr", powerProfile, 0, 2);
-      applyPowerProfile();                    // 立刻生效
-    }
     if (server.hasArg("apwr")) {
       int v = server.arg("apwr").toInt();
       autoPwrMin = AUTOPWR_MIN_OPTS[autoIdx(AUTOPWR_MIN_OPTS, v)];
@@ -1737,8 +2082,23 @@ static void handleApiSettings() {
   server.send(200, "application/json; charset=utf-8", settingsJson());
 }
 
+// 合并端点：设置面板要的东西一次拿完。设备一次只服务一个 HTTP 请求、
+// 每个请求还要一次全新三次握手（库里硬编码 Connection: close），实测干净路径
+// 吞吐只有 2~3 req/s —— 多台电脑各开着面板时，把 3 次请求合成 1 次是最实在的省。
+static void handleApiState() {
+  netTouch();
+  String j;
+  j.reserve(1024 + ringCount * 200);
+  j += "{\"info\":";     j += infoJson();
+  j += ",\"settings\":"; j += settingsJson();
+  j += ",\"notes\":";    j += notesJson();
+  j += "}";
+  server.send(200, "application/json; charset=utf-8", j);
+}
+
 // 链路自检：注入一条固定测试通知，完整走 fireAlert（响铃+震动+屏显）
 static void handleApiTest() {
+  netTouch();
   Note n{};
   strlcpy(n.computer,     "桥接程序", sizeof(n.computer));
   strlcpy(n.agent,        "测试",     sizeof(n.agent));
@@ -1832,6 +2192,26 @@ static void renderApScreen() {
   else       strlcpy(l, "192.168.4.1", sizeof(l));
   u8g2.drawUTF8(0, 63, l);
   u8g2.sendBuffer();
+}
+
+// 半开连接看门狗：Arduino WebServer 是严格单客户端串行的——任何一个「TCP 连上了但
+// 请求包没到」的连接，会让整台设备对所有电脑黑屏到 HTTP_MAX_DATA_WAIT（5 秒）为止。
+// 而链路本身有百分之几的丢包，多台电脑一起轮询时命中频率成倍上升（实测 3 台电脑约
+// 每 75 秒就撞一次）。这里在 loop 里盯着当前连接，400ms 还没数据就掐掉它，把最坏
+// 黑屏从 4.3 秒压到 0.4 秒。库里的 HTTP_MAX_DATA_WAIT 是裸 #define，改不动，只能这样。
+static void httpStuckWatchdog() {
+  static unsigned long waitSince = 0;
+  NetworkClient& c = server.client();
+  if (c && c.connected() && !c.available()) {
+    if (!waitSince) waitSince = millis();
+    else if (millis() - waitSince > 400) {
+      c.stop();
+      waitSince = 0;
+      Serial.println("[http] 掐掉一个不发数据的半开连接（防整机黑屏）");
+    }
+  } else {
+    waitSince = 0;
+  }
 }
 
 // ============================================================================
@@ -2032,7 +2412,6 @@ void setup() {
       prefs.end();
     }
   }
-  if (lastResetBrownout) markBrownoutSticky();   // 掉过电就长期记住（「自动」模式据此转省电）
   applyPowerProfile();                           // 按电源模式 + 实测 RSSI 定发射功率/休眠/主频
 
   // 已连上 → 关掉内核自动重连，掉线改由 wifiTick() 安静、定时地重试。
@@ -2043,11 +2422,12 @@ void setup() {
   // HTTP 服务不依赖连网时序：开机时路由器还没好（如停电恢复）也照常启动，连上 WiFi 即可用。
   // mDNS 要拿到 IP 才有意义，放在 loop 里首次连上后挂载。
   server.on("/notify",  handleNotify);      // 给电脑侧 hook 用（GET/POST 均可）
-  server.on("/healthz", []() { server.send(200, "text/plain", "ok"); });
+  server.on("/healthz", []() { netTouch(); server.send(200, "text/plain", "ok"); });
   server.on("/",        handleRoot);        // 网页设置控制台（读写 /api/settings）
   server.on("/api/info",     handleApiInfo);      // 设备身份 JSON（桥接程序扫描确认用）
   server.on("/api/settings", handleApiSettings);  // 读/改运行时设置（GET 读，POST 改）
   server.on("/api/notes",    handleApiNotes);     // 最近通知 JSON（控制台用）
+  server.on("/api/state",    handleApiState);     // info+settings+notes 一次拿完（桥接面板用）
   server.on("/api/test",     handleApiTest);      // 注入固定测试通知，验证链路
   server.onNotFound([]() { server.send(404, "text/plain", "not found"); });
   server.begin();
@@ -2107,7 +2487,7 @@ void loop() {
   // 只在连上时收 HTTP：掉线时 WebServer 遇半开连接会死等 5s（HTTP_MAX_DATA_WAIT），
   // 用状态守卫跳过即可 —— 不去 stop()/begin() 动 socket（网络已 down 时释放 lwIP
   // 套接字会崩，2026-08-05 实测过）。
-  if (WiFi.status() == WL_CONNECTED) server.handleClient();
+  if (WiFi.status() == WL_CONNECTED) { server.handleClient(); httpStuckWatchdog(); }
   wifiTick();                                // 掉线自愈（安静重试，不抢 CPU）
   // 首次连上 WiFi 后挂载 mDNS（开机没连上时每 2s 补查一次；掉线重连无需重挂）
   static bool mdnsUp = false;
@@ -2119,10 +2499,34 @@ void loop() {
       mdnsUp = true;
     }
   }
+  // 信号折线控件的数据源：每秒采一个 RSSI 样本（滚动窗口，最近 1 分钟）
+  {
+    static unsigned long lastRssi = 0;
+    if (millis() - lastRssi > 1000) {
+      lastRssi = millis();
+      int8_t v = (WiFi.status() == WL_CONNECTED) ? (int8_t)WiFi.RSSI() : 0;   // 0=离线/无效
+      if (rssiCount < RSSI_N) rssiHist[rssiCount++] = v;
+      else { memmove(rssiHist, rssiHist + 1, RSSI_N - 1); rssiHist[RSSI_N - 1] = v; }
+    }
+  }
+  // 统计：跨日翻页（哪怕当天一条通知都没有）+ 每 30 分钟落盘
+  {
+    static unsigned long lastStat = 0;
+    if (millis() - lastStat > 60000UL) {
+      lastStat = millis();
+      struct tm t;
+      if (clockNow(t)) statRollIfNeeded(t);
+    }
+    static unsigned long lastStatSave = 0;
+    if (millis() - lastStatSave > 30UL * 60000UL) {
+      lastStatSave = millis();
+      saveStats();
+    }
+  }
   // 省电模式下每 60s 按当前信号强度重新定发射功率（换了位置/信号变化就跟着调）
   {
     static unsigned long lastPwrChk = 0;
-    if (effPowerMode == 2 && WiFi.status() == WL_CONNECTED && millis() - lastPwrChk > 60000) {
+    if (WiFi.status() == WL_CONNECTED && millis() - lastPwrChk > 60000) {
       lastPwrChk = millis();
       applyPowerProfile();
     }

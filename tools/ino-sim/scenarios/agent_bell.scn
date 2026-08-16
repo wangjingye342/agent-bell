@@ -79,3 +79,24 @@ var lsty 1
 var rsty 0
 run 200ms
 snap 11_swapped
+
+# ===== 第二批半屏模块（2026-08-05）=====
+# 8翻页钟 9今日热力 10今日计数 11信号折线 12电源面板 13月相
+
+# 11) 翻页钟 + 今日热力
+var lsty 8
+var rsty 9
+run 300ms
+snap 12_flip_heat
+
+# 12) 今日计数 + 信号折线
+var lsty 10
+var rsty 11
+run 200ms
+snap 13_today_signal
+
+# 13) 电源面板 + 月相
+var lsty 12
+var rsty 13
+run 200ms
+snap 14_power_moon

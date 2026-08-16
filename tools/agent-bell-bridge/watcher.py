@@ -13,10 +13,8 @@ watcher.py — 盯着 Windows 通知中心，把 Claude / Codex 的新通知转�
 import socket
 import threading
 import time
-import urllib.parse
-import urllib.request
 
-_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # 绕过代理直连
+import device_api
 
 # 设备端 Note 各字段缓冲大小（字节，留余量），按 UTF-8 边界截断
 _LIMITS = {"computer": 22, "agent": 14, "conversation": 46, "message": 78}
@@ -36,26 +34,20 @@ def _clip(s, maxbytes):
     return ""
 
 
-def send_notify(host, port, agent, conversation, message, timeout=2.0):
-    """POST /notify 给设备。成功 True，失败 False（不抛异常）。"""
+def send_notify(host, port, agent, conversation, message, timeout=3.5):
+    """POST /notify 给设备。成功 True，失败 False（不抛异常）。
+
+    走 device_api 的串行锁：否则转发会和设备守护线程的探活撞在一起，
+    设备一次只服务一个请求，两边一起超时（实测 4 并发失败率 43%）。
+    """
     if not host:
         return False
-    fields = {
-        "computer": _clip(socket.gethostname(), _LIMITS["computer"]),
-        "agent": _clip(agent, _LIMITS["agent"]),
-        "conversation": _clip(conversation, _LIMITS["conversation"]),
-        "message": _clip(message, _LIMITS["message"]),
-    }
-    url = "http://%s:%d/notify" % (host, int(port or 80))
-    data = urllib.parse.urlencode(fields).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, method="POST",
-        headers={"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"})
-    try:
-        with _OPENER.open(req, timeout=timeout):
-            return True
-    except Exception:
-        return False
+    return device_api.send_notify(
+        host, port, timeout=timeout,
+        computer=_clip(socket.gethostname().split(".")[0], _LIMITS["computer"]),
+        agent=_clip(agent, _LIMITS["agent"]),
+        conversation=_clip(conversation, _LIMITS["conversation"]),
+        message=_clip(message, _LIMITS["message"]))
 
 
 class NotificationWatcher(threading.Thread):
@@ -80,6 +72,8 @@ class NotificationWatcher(threading.Thread):
         self._seen = set()          # 已处理过的通知 id
         self._primed = False        # 首轮只记 id 不转发（开机别把历史通知全响一遍）
         self._last_sent = 0.0       # 冷却计时（monotonic）
+        self._pending = None        # 冷却中/发送失败的通知，暂存待发（只留最新一条）
+        self._pending_tries = 0     # 已经为它重试过几次
 
     def run(self):
         try:
@@ -114,6 +108,7 @@ class NotificationWatcher(threading.Thread):
                     self.stop_event.wait(10)
                     continue
                 self.status = "ok"
+                self._flush_pending(time.monotonic())      # 先把上轮欠着的补发掉
                 notes = listener.get_notifications_async(NotificationKinds.TOAST).get()
                 self._process(list(notes), KnownNotificationBindings, time.monotonic())
             except Exception as e:
@@ -155,34 +150,61 @@ class NotificationWatcher(threading.Thread):
         if not fresh or not self.cfg.get("forward_enabled"):
             return
 
+        app, texts = fresh[-1]                       # 一批只转发最新一条（设备只响一次）
+        note = {
+            "agent": app,
+            "conversation": texts[0] if texts else "-",
+            "message": " ".join(texts[1:]) if len(texts) > 1 else "",
+        }
+        if len(fresh) > 1:
+            note["message"] = ("[+%d条] " % (len(fresh) - 1)) + note["message"]
+
+        # 冷却期内不丢弃，暂存成「待发」——下一轮冷却过了会补发。
+        # 冷却的语义是「一批只响一次」，不该是「第二条静默消失」。
         cooldown = float(self.cfg.get("cooldown_s") or 3.0)
         if now - self._last_sent < cooldown:
-            self.log("监听：%d 条新通知在冷却期内，跳过" % len(fresh))
+            self._pending, self._pending_tries = note, 0
+            self.log("监听：%d 条新通知在冷却期内，暂存待发" % len(fresh))
             return
+        self._deliver(note, now)
 
-        app, texts = fresh[-1]                       # 一批只转发最新一条（设备只响一次）
-        agent = app
-        conversation = texts[0] if texts else "-"
-        message = " ".join(texts[1:]) if len(texts) > 1 else ""
-        if len(fresh) > 1:
-            message = ("[+%d条] " % (len(fresh) - 1)) + message
+    # ---------- 投递：失败进暂存，下一轮继续（通知不能因为一次丢包就永久消失） ----------
+    MAX_TRIES = 3
 
+    def _deliver(self, note, now):
         host = self.get_host()
         if not host:
-            self.log("监听：有新通知但设备离线，丢弃（%s）" % agent)
-            if self.on_device_lost:
-                self.on_device_lost()
-            return
-        ok = send_notify(host, self.cfg.get("device_port"), agent, conversation, message)
+            self._pending, self._pending_tries = note, 0
+            self.log("监听：有新通知但设备离线，暂存待发（%s）" % note["agent"])
+            return False
+        ok = send_notify(host, self.cfg.get("device_port"),
+                         note["agent"], note["conversation"], note["message"])
         if ok:
             self._last_sent = now
-            self.log("转发：%s | %s" % (agent, conversation))
+            self._pending, self._pending_tries = None, 0
+            self.log("转发：%s | %s" % (note["agent"], note["conversation"]))
             if self.on_forwarded:
-                self.on_forwarded(agent, conversation)
+                self.on_forwarded(note["agent"], note["conversation"])
+            return True
+        self._pending = note
+        self._pending_tries += 1
+        if self._pending_tries < self.MAX_TRIES:
+            self.log("转发：失败，第 %d/%d 次重试待发（%s）"
+                     % (self._pending_tries, self.MAX_TRIES, note["agent"]))
         else:
-            self.log("转发：失败（设备可能掉线），触发重新发现")
-            if self.on_device_lost:
+            self._pending, self._pending_tries = None, 0
+            self.log("转发：%d 次都失败，放弃这条（设备可能掉线）" % self.MAX_TRIES)
+            if self.on_device_lost:            # 只有重试预算用尽才怀疑连接
                 self.on_device_lost()
+        return False
+
+    def _flush_pending(self, now):
+        """每轮开头补发暂存的通知（冷却过了、设备回来了就发出去）。"""
+        if not self._pending or not self.cfg.get("forward_enabled"):
+            return
+        if now - self._last_sent < float(self.cfg.get("cooldown_s") or 3.0):
+            return
+        self._deliver(self._pending, now)
 
     def stop(self):
         self.stop_event.set()

@@ -22,11 +22,15 @@ LOG_PATH = os.path.join(APP_DIR, "bridge.log")
 DEFAULTS = {
     "forward_enabled": True,              # 总开关：是否转发通知到设备
     "app_keywords": ["claude", "codex"],  # 应用显示名包含这些词（不分大小写）才转发
-    "poll_interval_s": 2.0,               # 通知中心轮询间隔（秒）
+    "poll_interval_s": 2.0,               # 通知中心轮询间隔（秒，只读本机，不碰设备）
     "cooldown_s": 3.0,                    # 两次转发的最小间隔（一批通知只响一次）
     "device_host": "",                    # 上次发现的设备 IP（发现缓存，加速下次启动）
     "device_port": 80,
-    "health_interval_s": 20.0,            # 设备探活间隔（秒）
+    # 设备探活间隔（秒）。设备一次只服务一个 HTTP 请求、实测干净路径吞吐 2~3 req/s，
+    # 多台电脑一起连时请求预算很紧；30 秒足够及时，且实际会加 ±20% 抖动错开。
+    # 顺带也省电：每次探活都要把设备的射频从休眠里唤起来一次。
+    "health_interval_s": 30.0,
+    "panel_poll_s": 30.0,                 # 设置面板回读间隔（秒，仅窗口可见时轮询）
 }
 
 

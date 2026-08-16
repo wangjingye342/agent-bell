@@ -21,6 +21,7 @@ UI 是本地 HTML（ui/index.html），JS 经 pywebview js_api 调下面的 Api 
 运行：pythonw bridge.py   （install.bat 会装好自启；--show 启动即显示窗口）
 """
 import os
+import random
 import socket
 import subprocess
 import sys
@@ -167,21 +168,33 @@ class DeviceManager(threading.Thread):
         self.stop_event = threading.Event()
         self._wake = threading.Event()
         self._backoff = 5.0
+        self.strikes = 0                         # 连续探活失败次数（UI 显示用）
+
+    # 连续失败几次才判离线：单次请求本身就有几个百分点的失败率（丢包 + 设备
+    # 调制解调器休眠的重传尾巴），一次失败就重扫全网段既误判又浪费。
+    STRIKES_TO_OFFLINE = 3
 
     def run(self):
         while not self.stop_event.is_set():
             if self.host:
-                # —— 在线：周期探活 ——
+                # —— 在线：周期探活（间隔加 ±20% 抖动，多台电脑不要撞在同一刻）——
+                base = float(self.cfg.get("health_interval_s") or 30.0)
                 info = device_api.get_info(self.host, self.cfg.get("device_port"))
                 if info:
                     self.info = info
-                    self._sleep(float(self.cfg.get("health_interval_s") or 20.0))
+                    self.strikes = 0
+                    self._sleep(base * random.uniform(0.8, 1.2))
                     continue
-                if discovery.check_device(self.host, self.cfg.get("device_port")):
-                    self._sleep(float(self.cfg.get("health_interval_s") or 20.0))
+                self.strikes += 1
+                if self.strikes < self.STRIKES_TO_OFFLINE:
+                    log("设备守护：探活失败 %d/%d（先不判离线，稍后重试）"
+                        % (self.strikes, self.STRIKES_TO_OFFLINE))
+                    self._sleep(min(4.0, base / 3.0))
                     continue
-                log("设备守护：%s 探活失败，标记离线" % self.host)
+                log("设备守护：%s 连续 %d 次探活失败，标记离线"
+                    % (self.host, self.strikes))
                 self.host = None
+                self.strikes = 0
                 self.on_state_change(False)
             # —— 离线：找设备 ——
             self.scanning = True
@@ -195,6 +208,7 @@ class DeviceManager(threading.Thread):
                 self.host = found
                 self.info = device_api.get_info(found, self.cfg.get("device_port")) or {}
                 self._backoff = 5.0
+                self.strikes = 0
                 self.on_state_change(True)
                 log("设备守护：已连接 %s" % found)
             else:
@@ -205,9 +219,15 @@ class DeviceManager(threading.Thread):
         self._wake.wait(seconds)
         self._wake.clear()
 
-    def notify_lost(self):
-        """外部（转发失败）报告设备可能掉线：立即重查。"""
-        self._backoff = 5.0
+    def notify_lost(self, reset_backoff=False):
+        """外部报告设备可能不通：立即重查一次。
+
+        reset_backoff 只给「用户正盯着」的操作用（点测试/改设置失败）。转发失败
+        一律不重置，否则设备真离线时每来一条通知都把退避打回 5 秒，
+        变成每 5 秒重扫一整个网段。
+        """
+        if reset_backoff:
+            self._backoff = 5.0
         self._wake.set()
 
     def force_rediscover(self):
@@ -280,12 +300,14 @@ class Api:
             "scanning": bool(dm.scanning), "scan_done": d, "scan_total": t,
             "rssi": info.get("rssi"), "uptime_s": info.get("uptime_s"),
             "listener": self._watcher.status,
+            "strikes": getattr(self._dm, "strikes", 0),
             "forward": bool(self._cfg.get("forward_enabled")),
             "autostart": get_autostart(),
             "keywords": ", ".join(self._cfg.get("app_keywords") or []),
             "poll_s": float(self._cfg.get("poll_interval_s") or 2.0),
             "cooldown_s": float(self._cfg.get("cooldown_s") or 3.0),
             "manual": self._cfg.get("device_host") or "",
+            "panel_poll_s": float(self._cfg.get("panel_poll_s") or 30.0),
             "platform": "mac" if IS_MAC else "win",
         }
 
@@ -304,7 +326,7 @@ class Api:
                                        **(fields or {}))
         if res is None:
             log("设置：写入失败（设备掉线？）")
-            self._dm.notify_lost()
+            self._dm.notify_lost(reset_backoff=True)   # 用户正盯着，立刻重查
         return res
 
     def get_notes(self):
@@ -313,13 +335,29 @@ class Api:
             return None
         return device_api.get_notes(host, self._cfg.get("device_port"))
 
+    def get_panel(self):
+        """面板一次要的全部数据（设置 + 最近通知）。
+
+        设备一次只服务一个 HTTP 请求、实测干净路径吞吐只有 2~3 req/s，
+        所以优先走固件的合并端点 /api/state；老固件没有就退回分别取。
+        """
+        host = self._dm.host
+        if not host:
+            return None
+        port = self._cfg.get("device_port")
+        st = device_api.get_state(host, port)
+        if st:
+            return {"settings": st.get("settings"), "notes": st.get("notes")}
+        return {"settings": device_api.get_settings(host, port),
+                "notes": device_api.get_notes(host, port)}
+
     # ---- 链路动作 ----
     def send_test(self):
         host = self._dm.host
         ok = bool(host and device_api.send_test(host, self._cfg.get("device_port")))
         log("测试：已发送" if ok else "测试：失败（设备离线）")
         if not ok:
-            self._dm.notify_lost()
+            self._dm.notify_lost(reset_backoff=True)
         return ok
 
     def rediscover(self):
