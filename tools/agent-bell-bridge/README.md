@@ -24,6 +24,7 @@ Bridge 的优势是**装一次全局生效**，且能看到所有会发系统通
 
 托盘出现 🔔 图标即在运行：**绿点 = 设备在线，红点 = 离线**。
 左键双击图标打开设置窗口；卸载运行 [uninstall.bat](uninstall.bat)。
+（macOS 上图标在顶部菜单栏、不在 Dock 里，见下面的 macOS 版一节。）
 
 ## 自动发现（断连自愈）
 
@@ -128,13 +129,23 @@ webview.platforms.winforms/edgechromium 都是运行时动态导入，必须保�
 
 同一份代码直接支持 macOS（12+）：通知监听换成轮询「通知中心」数据库
 （`watcher_mac.py`），自启用 `~/Library/LaunchAgents`，界面/发现/转发与
-Windows 完全一致（菜单栏图标 = 托盘）。
+Windows 完全一致。
+
+**只驻留菜单栏，不进 Dock**（accessory 应用）：点顶部菜单栏的铃铛图标弹出菜单，
+第一项「打开设置」就是面板；面板的 × 收回菜单栏，后台继续转发；退出走菜单里的
+「退出」或面板的「退出程序」。
+
+> 实现上必须两处配合：`.app` 的 `Info.plist` 带 `LSUIElement=true`（启动那一刻就没有
+> Dock 图标），**加上**运行时把 NSApp 活动策略设回 Accessory——因为 pywebview 的 cocoa
+> 后端在导入时会把策略改成 Regular，Dock 图标会冒出来。见 `bridge.py` 的 `_mac_accessory()`；
+> CI 里有一步断言构建产物的 `LSUIElement` 为 true，别把它删了。
+> 菜单栏图标万一创建失败，程序会自动恢复 Dock 图标并亮出窗口兜底（否则用户没有任何入口）。
 
 **构建**（.app 只能在 Mac 上打，不能在 Windows 交叉编译）：
 
 ```sh
 cd tools/agent-bell-bridge && bash pack/build_mac.sh
-# 产物：pack/Output/AgentBellBridge-mac.dmg
+# 产物：pack/Output/AgentBellBridge-mac-<架构>.dmg（applesilicon / intel）
 ```
 
 **安装与授权**（目标 Mac 上）：
@@ -148,7 +159,7 @@ cd tools/agent-bell-bridge && bash pack/build_mac.sh
 **源码直接跑**（免打包）：`python3 -m pip install pywebview pystray pillow`
 后 `python3 bridge.py`（首次运行给终端/解释器授完全磁盘访问权限即可）。
 
-已知差异：窗口关闭 = 收进菜单栏（若菜单栏图标创建失败则直接退出，日志有记录）；
-无边框窗口没有最小化。**注意：macOS 版尚未在真机验证过**——通知库解析逻辑有
-跨平台单测护着，但 pywebview/菜单栏/权限流程需要在 Mac 上实测，问题看
-`~/Library/Application Support/AgentBell/bridge.log`。
+已知差异：窗口关闭 = 收进菜单栏；无边框窗口没有最小化（mac 上 `–` 键隐藏，
+按菜单栏图标唤回）。**注意：macOS 版尚未在真机验证过**——通知库解析逻辑有
+跨平台单测护着、`.app` 的菜单栏驻留配置由 CI 断言，但 pywebview/权限流程需要在
+Mac 上实测，问题看 `~/Library/Application Support/AgentBell/bridge.log`。
