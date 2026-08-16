@@ -26,6 +26,7 @@
   #include <WebServer.h>
   #include <ESPmDNS.h>
   #include <DNSServer.h>     // 配网热点的强制门户（captive portal）DNS
+  #include <WiFiUdp.h>       // 局域网发现应答（一个广播包换掉 254 次 TCP 扫描）
   #include <Preferences.h>   // 把网页里的开关存进 NVS，掉电不丢
 #endif
 
@@ -2114,6 +2115,37 @@ static void handleApiTest() {
 //  手机/电脑连它 → 强制门户弹配置页（或访问 192.168.4.1）→ 填 WiFi → 设备重启去连。
 //  电脑侧 tools/agent-bell-bridge/provision.py 可全自动完成这套流程。
 // ============================================================================
+//  局域网发现应答器（UDP 47317）
+//  电脑侧要找设备时只发一个广播包，收到 "AGENTBELL?" 就把 /api/info 的 JSON 回过去。
+//  为什么值得加：原来的兜底手段是对整个 /24 逐个发 HTTP（254 次 TCP 连接），
+//  实测那场突发会把设备自己的响应延迟推过客户端超时——漏检率从空闲 5% 涨到 20%，
+//  风暴停了 2 秒还有 33%，也就是「扫描器自己把要找的设备打趴了」。
+//  UDP 应答走 lwIP 自己的任务，不经 WebServer 那条串行路径，几乎零代价。
+// ============================================================================
+static WiFiUDP discoUdp;
+static const uint16_t DISCO_PORT = 47317;
+static bool discoUp = false;
+
+static void discoveryTick() {
+  if (!discoUp) {
+    if (WiFi.status() != WL_CONNECTED) return;
+    discoUp = discoUdp.begin(DISCO_PORT);
+    return;
+  }
+  int sz = discoUdp.parsePacket();
+  if (sz <= 0) return;
+  char buf[24];
+  int n = discoUdp.read(buf, sizeof(buf) - 1);
+  buf[n > 0 ? n : 0] = 0;
+  if (strncmp(buf, "AGENTBELL?", 10) != 0) return;    // 不是问我们的，忽略
+  netTouch();                                          // 有电脑在找它 = 有活动
+  String j = infoJson();
+  discoUdp.beginPacket(discoUdp.remoteIP(), discoUdp.remotePort());
+  discoUdp.write((const uint8_t*)j.c_str(), j.length());
+  discoUdp.endPacket();
+}
+
+// ============================================================================
 static const char* AP_PASS = "agentbell";   // 热点密码（8 位起；页面和 OLED 都会显示）
 
 // 配网页（内存页面，无外部资源；手机弱信号也秒开）
@@ -2488,6 +2520,7 @@ void loop() {
   // 用状态守卫跳过即可 —— 不去 stop()/begin() 动 socket（网络已 down 时释放 lwIP
   // 套接字会崩，2026-08-05 实测过）。
   if (WiFi.status() == WL_CONNECTED) { server.handleClient(); httpStuckWatchdog(); }
+  discoveryTick();                           // UDP 广播发现应答（不经 WebServer）
   wifiTick();                                // 掉线自愈（安静重试，不抢 CPU）
   // 首次连上 WiFi 后挂载 mDNS（开机没连上时每 2s 补查一次；掉线重连无需重挂）
   static bool mdnsUp = false;

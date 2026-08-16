@@ -128,6 +128,7 @@ WiFi 发射峰值电流（19.5dBm 约 350mA）会把 3.3V 轨拽到欠压阈值�
 | `GET /healthz` | 探活 |
 | `GET /api/info` | 设备身份 JSON（`app:"agent-bell"`、mac、ip、rssi、uptime_s、brownouts 掉电次数、lowpower 是否已转省电；桥接程序扫描网段时靠它确认）|
 | `GET /api/settings` | 读全部运行时设置（JSON，含 `melodies`/`panes` 名称表）|
+| `UDP 47317` | 局域网发现应答：收到 `AGENTBELL?` 就把 `/api/info` 的 JSON 回给发送方。一个广播包替掉 254 次 TCP 扫描——那种扫描的突发会把设备自己打趴（实测漏检率 5%→20%），而 UDP 走 lwIP 自己的任务，不经 WebServer 的串行路径 |
 | `GET /api/state` | `{info, settings, notes}` 一次拿完——设备一次只服务一个 HTTP 请求，多台电脑连时把 3 次请求合成 1 次是最实在的省 |
 | `POST /api/settings` | 改设置，字段全部可选、只改传了的：开关 `buzz/vib/dnd/encrev/nwake`（0\|1）、强度 `bvol/vvol/fbvol/fbvib`（0–100）、`tone`（提示音 0–6）、`fb`（反馈方式 0–3）、`encdet`（灵敏度 1–3）、`lsty/rsty`（半屏样式 0–7）、`aoff`（自动熄屏分钟 0/1/2/5/10/20/30）、`apwr`（自动关机分钟 0/10/20/30/60/120/240）；另有动作参数 `play=1` 试听 / `vibtest=1` 试震。应答同 GET |
 | `GET\|POST /api/test` | 注入一条固定测试通知，完整走响铃+震动+屏显，验证链路 |

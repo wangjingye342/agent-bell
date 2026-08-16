@@ -3,11 +3,15 @@
 """
 discovery.py — 在局域网里找 AgentBell 设备，并持续盯着它别掉线。
 
-查找顺序（快到慢，实测代价依次是毫秒级 / 几十毫秒 / 几秒）：
-  1. 配置里缓存的上次 IP
-  2. **原始 mDNS 组播查询**（自己发 UDP 5353 问 agent-bell.local，不走系统 DNS）
-  3. 缓存 IP 所在 /24 的子网扫描（换 IP 但没换路由器时命中）
-  4. 其余本机网段扫描
+查找顺序（快到慢）：
+  1. **UDP 广播**（问 47317，固件里有应答器）——一个包，实测 0.21 秒，且 IP 变了也能找到
+  2. 配置里缓存的上次 IP（老固件没有广播应答器时靠它）
+  3. **原始 mDNS 组播查询**（自己发 UDP 5353，不走系统 DNS）
+  4. 子网扫描：先缓存 IP 所在的 /24，再扩到其它网卡（**最后手段**，见下）
+
+为什么把子网扫描压到最后：实测它不只是慢，那 253 路并发 TCP/ARP 突发会把设备
+自己的响应延迟推过客户端超时——漏检率空闲时 5%、风暴中 20%、风暴停止 2 秒后
+仍有 33%。也就是说扫描器会把它要找的设备打趴，然后报告「没找到」。
 
 为什么不用 socket.gethostbyname("agent-bell.local")：本机装了 Clash 一类的
 TUN 代理时，.local 域名会被 fake-ip 劫持到 198.18.0.0/15 然后被 RST，
@@ -22,8 +26,11 @@ TUN 代理时，.local 域名会被 fake-ip 劫持到 198.18.0.0/15 然后被 RS
 import concurrent.futures
 import ipaddress
 import json
+import re
 import socket
 import struct
+import subprocess
+import sys
 import threading
 import urllib.request
 
@@ -32,6 +39,8 @@ import device_api
 MDNS_NAME = "agent-bell"
 MDNS_ADDR = "224.0.0.251"
 MDNS_PORT = 5353
+DISCO_PORT = 47317          # 固件的 UDP 发现应答端口（见 agent_bell.ino discoveryTick）
+DISCO_MAGIC = b"AGENTBELL?"
 
 # 扫描参数（按实测定：设备成功响应的延迟 p90 可达 1.2 秒，1.0 秒超时会漏掉
 # 10~20% 的探测——日志里「扫描 4 秒就说没找到」正是这么来的）
@@ -44,7 +53,25 @@ _SKIP_NETS = [
     ipaddress.IPv4Network("100.64.0.0/10"),    # 运营商级 NAT / Tailscale
     ipaddress.IPv4Network("169.254.0.0/16"),   # link-local（没拿到 DHCP 时的自分配地址）
     ipaddress.IPv4Network("172.17.0.0/16"),    # Docker 默认桥
+    ipaddress.IPv4Network("240.0.0.0/4"),      # 保留段（顺带挡住被当成地址的 255.x 掩码）
 ]
+
+
+def _is_netmask(ip):
+    """看起来像子网掩码（连续 1 后面全 0）就不是主机地址。
+
+    从 ipconfig / ifconfig 的输出里正则捞点分四段时，掩码会一起被捞出来；
+    255.255.255.0 恰好落在 Python 认作 private 的 240.0.0.0/4 里，
+    不挡掉就会凭空多扫 254 个必然超时的地址。
+    """
+    try:
+        v = int(ipaddress.IPv4Address(ip))
+    except Exception:
+        return True
+    if v == 0:
+        return True
+    inv = (~v) & 0xFFFFFFFF                       # 连续 1 的反码必是 2^n-1
+    return (inv & (inv + 1)) == 0
 
 
 def _http_get(host, port, path, timeout):
@@ -89,6 +116,62 @@ def check_device(host, port=80, timeout=3.0):
     if probe_info(host, port, half) is not None:
         return True
     return probe_alive(host, port, half)
+
+
+# ============================================================================
+#  UDP 广播发现：一个包换掉 254 次 TCP 扫描
+#  实测子网扫描不只是慢——那 253 路并发 TCP/ARP 突发会把设备自己的响应延迟推过
+#  客户端超时（漏检率从空闲 5% 涨到风暴中 20%、风暴停后 2 秒仍 33%），
+#  等于扫描器把要找的设备打趴了。所以能广播就绝不扫描。
+# ============================================================================
+def _udp_discover(timeout=0.6):
+    """向本机各网段广播 AGENTBELL?，返回第一个应答设备的 IP（没有则 None）。"""
+    targets = ["255.255.255.255"]
+    for ip in _local_ips():
+        try:
+            net = ipaddress.IPv4Network(ip + "/24", strict=False)
+            targets.append(str(net.broadcast_address))
+        except Exception:
+            continue
+    socks = []
+    for src in _local_ips() + ["0.0.0.0"]:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.bind((src, 0))
+            s.settimeout(timeout)
+            for dst in targets:
+                try:
+                    s.sendto(DISCO_MAGIC, (dst, DISCO_PORT))
+                except Exception:
+                    pass
+            socks.append(s)
+        except Exception:
+            try:
+                s.close()
+            except Exception:
+                pass
+    try:
+        for s in socks:
+            try:
+                while True:
+                    data, addr = s.recvfrom(1024)
+                    try:
+                        info = json.loads(data.decode("utf-8", "replace"))
+                    except Exception:
+                        continue
+                    if isinstance(info, dict) and info.get("app") == "agent-bell":
+                        return info.get("ip") or addr[0]
+            except Exception:
+                continue
+    finally:
+        for s in socks:
+            try:
+                s.close()
+            except Exception:
+                pass
+    return None
 
 
 # ============================================================================
@@ -210,6 +293,7 @@ def _local_ips():
         s.close()
     except Exception:
         pass
+    ips |= _ips_from_os()                          # 上面两条都可能漏，问一遍系统
     out = []
     for ip in ips:
         try:
@@ -221,6 +305,32 @@ def _local_ips():
             out.append(ip)
         except Exception:
             continue
+    return out
+
+
+def _ips_from_os():
+    """问系统要网卡地址。前两种办法在 TUN 代理环境下都会失灵：
+
+    · getaddrinfo(gethostname()) 可能只返回虚拟网卡
+    · 路由源探测（connect 到公网 IP）会返回 TUN 网卡地址（实测 198.18.0.1），
+      随后被排除列表滤掉 —— 等于完全没有兜底，真实网段一旦漏掉，
+      扫描目标为空会在 0.01 秒内报「未找到」，看起来像玄学故障。
+    """
+    out = set()
+    try:
+        if sys.platform == "win32":
+            txt = subprocess.check_output(
+                ["ipconfig"], text=True, errors="ignore", timeout=6,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        else:
+            txt = subprocess.check_output(["ifconfig"], text=True,
+                                          errors="ignore", timeout=6)
+    except Exception:
+        return out
+    for m in re.finditer(r"([0-9]{1,3}(?:[.][0-9]{1,3}){3})", txt):
+        ip = m.group(1)
+        if not _is_netmask(ip):                   # 掩码/全零地址一起挡掉
+            out.add(ip)
     return out
 
 
@@ -309,8 +419,17 @@ def find_device(cfg, log=None, on_progress=None, stop_event=None):
             log(msg)
 
     port = int(cfg.get("device_port") or 80)
-
     cached = (cfg.get("device_host") or "").strip()
+
+    # 广播放在缓存之前：一个 UDP 包 0.2 秒就有结果，而缓存地址失效时要白等 3 秒
+    # （换路由器/DHCP 重分配后必然失效）。设备没换地址时两者都是 0.2 秒级，不亏。
+    ip = _udp_discover()
+    if ip and probe_info(ip, port) is not None:
+        if ip != cached:
+            _log("发现：UDP 广播命中 %s" % ip)
+        cfg.set("device_host", ip)
+        return ip
+
     if cached and check_device(cached, port):
         _log("发现：缓存地址可用 %s" % cached)
         return cached
