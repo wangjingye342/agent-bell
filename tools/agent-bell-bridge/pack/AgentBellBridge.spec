@@ -22,6 +22,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(SRC, "ui"), "ui"),               # 设置面板 HTML
+        (os.path.join(HERE, "icon_art.py"), "pack"),    # 托盘/菜单栏图标画法
     ],
     hiddenimports=[
         # —— WinRT 通知监听（bridge 在线程里 import，PyInstaller 静态分析看不到）——

@@ -7,7 +7,8 @@ discovery.py — 在局域网里找 AgentBell 设备，并持续盯着它别掉�
   1. **UDP 广播**（问 47317，固件里有应答器）——一个包，实测 0.21 秒，且 IP 变了也能找到
   2. 配置里缓存的上次 IP（老固件没有广播应答器时靠它）
   3. **原始 mDNS 组播查询**（自己发 UDP 5353，不走系统 DNS）
-  4. 子网扫描：先缓存 IP 所在的 /24，再扩到其它网卡（**最后手段**，见下）
+  4. **ARP 邻居**：系统 ARP 表里活着的十几个地址，纯出站 TCP（防火墙不拦）
+  5. 子网扫描：先缓存 IP 所在的 /24，再扩到其它网卡（**最后手段**，见下）
 
 为什么把子网扫描压到最后：实测它不只是慢，那 253 路并发 TCP/ARP 突发会把设备
 自己的响应延迟推过客户端超时——漏检率空闲时 5%、风暴中 20%、风暴停止 2 秒后
@@ -334,6 +335,44 @@ def _ips_from_os():
     return out
 
 
+def arp_candidates(subnets=None):
+    """从系统 ARP 表里拿本网段活着的主机 IP。
+
+    为什么需要这条路：UDP 广播/组播发现依赖设备的**入站**回包，而 Windows 防火墙
+    默认丢弃未经请求的入站 UDP —— 打包后的 exe 没被放行时，广播和 mDNS 都收不到
+    应答（用 python.exe 跑能通，是因为它早前被放行过），于是只能退回全网段扫描。
+    ARP 表是纯本地信息，探它列出的十几个地址是**出站** TCP，防火墙不拦，
+    比逐个试 254 个地址快一个数量级。
+    """
+    try:
+        if sys.platform == "win32":
+            txt = subprocess.check_output(
+                ["arp", "-a"], text=True, errors="ignore", timeout=6,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        else:
+            txt = subprocess.check_output(["arp", "-an"], text=True,
+                                          errors="ignore", timeout=6)
+    except Exception:
+        return []
+    nets = subnets if subnets is not None else _local_subnets()
+    out, seen = [], set()
+    for m in re.finditer(r"([0-9]{1,3}(?:[.][0-9]{1,3}){3})", txt):
+        ip = m.group(1)
+        if ip in seen or _is_netmask(ip):
+            continue
+        try:
+            addr = ipaddress.IPv4Address(ip)
+        except Exception:
+            continue
+        if addr.is_multicast or addr.packed[-1] in (0, 255):
+            continue
+        if nets and not any(addr in n for n in nets):
+            continue
+        seen.add(ip)
+        out.append(ip)
+    return out
+
+
 def _local_subnets():
     """本机所有值得扫的 /24 网段（去重，保持发现顺序）。"""
     nets, seen = [], set()
@@ -430,7 +469,9 @@ def find_device(cfg, log=None, on_progress=None, stop_event=None):
         cfg.set("device_host", ip)
         return ip
 
-    if cached and check_device(cached, port):
+    # 缓存地址给 2 秒预算就够：失败也不会放弃（后面还有 mDNS/ARP/扫描），
+    # 但换过网段时能少白等 1 秒
+    if cached and check_device(cached, port, timeout=2.0):
         _log("发现：缓存地址可用 %s" % cached)
         return cached
 
@@ -440,7 +481,17 @@ def find_device(cfg, log=None, on_progress=None, stop_event=None):
         cfg.set("device_host", ip)
         return ip
 
-    _log("发现：开始扫描局域网……")
+    # ARP 候选：出站 TCP 探十几个「已知活着」的地址，比全网段扫快一个数量级，
+    # 而且不依赖入站 UDP（打包后的 exe 常被防火墙挡掉广播/组播的回包）
+    cands = arp_candidates()
+    if cands:
+        ip, info, _ = _scan_targets(cands, port, SCAN_TIMEOUT, None, stop_event)
+        if ip:
+            _log("发现：ARP 邻居命中 %s（试了 %d 个）" % (ip, len(cands)))
+            cfg.set("device_host", ip)
+            return ip
+
+    _log("发现：开始扫描局域网（%d 个 ARP 邻居里没有，逐个试）……" % len(cands))
     ip, info = scan_subnets(port, on_progress=on_progress, stop_event=stop_event,
                             prefer=cached or None)
     if ip:

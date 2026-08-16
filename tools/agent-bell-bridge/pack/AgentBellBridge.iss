@@ -4,7 +4,7 @@
 ; 特点：单用户安装（不要管理员）、可选开机自启、卸载时清理自启注册表项
 
 #define AppName "AgentBell Bridge"
-#define AppVersion "2.2.0"
+#define AppVersion "2.2.1"
 #define AppExe "AgentBellBridge.exe"
 
 [Setup]

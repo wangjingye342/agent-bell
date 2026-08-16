@@ -1,12 +1,21 @@
 # -*- coding: utf-8 -*-
-"""make_icon.py — 从 bridge.make_icon_image 生成多尺寸 .ico（打包用，一次性）。"""
+"""make_icon.py — 生成 Windows 多尺寸图标 pack/agentbell.ico。
+
+分尺寸画法：16/20/24 只留橙铃铛（那种尺寸机身会糊成一团），32 以上是完整的
+铝面板 + 深色屏。图形定义在 icon_art.py，托盘与 macOS 菜单栏共用同一套几何。
+用法：python pack/make_icon.py
+"""
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from bridge import make_icon_image  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import icon_art  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agentbell.ico")
-img = make_icon_image(True)
-img.save(OUT, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64)])
-print("icon ->", OUT)
+SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+OUT = os.path.join(HERE, "agentbell.ico")
+
+imgs = [icon_art.app_icon(n, chassis=(n >= 32)) for n in SIZES]
+imgs[-1].save(OUT, format="ICO", sizes=[(n, n) for n in SIZES],
+              append_images=imgs[:-1])
+print("icon ->", OUT, os.path.getsize(OUT), "bytes")

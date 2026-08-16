@@ -54,6 +54,26 @@
 | 试听按钮 | 试听 / 试震 |
 | 区块标题 | 双语铭牌式 "NOTIFY · 通知"（英文大写拉字距 + 中文） |
 
+## 图标系统
+
+画法一处定义在 `tools/agent-bell-bridge/pack/icon_art.py`，三个用途同一套铃铛几何
+（半圆罩 + 外张裙摆 + 收边横条 + 锤点，22 单位网格），所以看起来是一家人。
+
+| 用途 | 画法 | 为什么 |
+|---|---|---|
+| 应用图标（Dock/任务栏/安装器）| 拉丝铝 squircle + 内凹深色屏 + 屏里印 TE 橙铃铛 | 它就是一小块 AgentBell 面板；深浅对比让它在 32px 也立得住 |
+| 应用图标 16–24px | 只留橙铃铛，无机身 | 那种尺寸机身会糊成一团 |
+| Windows 托盘 | 橙铃铛 + 右下状态点（绿=在线 红=离线）| 托盘允许彩色，状态点是有用信息 |
+| macOS 菜单栏 | **模板图**（纯 alpha 单色），在线=实心铃铛 / 离线=空心铃铛 | 模板图由系统按菜单栏明暗自动上色，永远看得见；没有颜色可用，所以用形状区分状态（实测 22pt 下"加斜杠"会糊成一团） |
+
+生成：`python pack/make_icon.py`（.ico，分尺寸画法）、`python pack/make_icns.py`（.icns）。
+两个 PyInstaller spec 都要把 `icon_art.py` 带进 `datas`，否则打包版画不出托盘图标。
+
+> macOS 陷阱：pystray 的 `_start_setup()` 在**后台线程**里设图标，而 AppKit 不允许
+> 非主线程改 UI —— 菜单栏会只剩一个能点的空白位。必须自己在主线程
+> `setImage_`（见 `bridge.py` 的 `_mac_apply_tray`），并给 `run_detached` 传空 setup
+> 避免两边打架。
+
 ## 模式与底线（Operate）
 
 表达永不遮蔽任务。正文对比度 ≥4.5:1；`:focus-visible` 橙框；`prefers-reduced-motion` 尊重；

@@ -21,6 +21,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(SRC, "ui"), "ui"),               # 设置面板 HTML
+        (os.path.join(HERE, "icon_art.py"), "pack"),    # 托盘/菜单栏图标画法
     ],
     hiddenimports=[
         "webview.platforms.cocoa",                     # pywebview macOS 后端
@@ -61,7 +62,7 @@ app = BUNDLE(
         "LSUIElement": True,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
-        "CFBundleShortVersionString": "2.2.0",
+        "CFBundleShortVersionString": "2.2.1",
         "NSHumanReadableCopyright": "AgentBell",
     },
 )

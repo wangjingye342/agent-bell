@@ -262,18 +262,66 @@ class DeviceManager(threading.Thread):
 # ============================================================================
 #  托盘图标（pystray）：铃铛 + 右下角状态点（绿=在线 红=离线）
 # ============================================================================
+def _icon_art():
+    """载入 pack/icon_art（图标画法一处定义，打包后 ui/ 同级也在）。"""
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    for cand in (os.path.join(base, "pack"), base):
+        if os.path.exists(os.path.join(cand, "icon_art.py")):
+            if cand not in sys.path:
+                sys.path.insert(0, cand)
+            break
+    import icon_art
+    return icon_art
+
+
 def make_icon_image(online):
-    from PIL import Image, ImageDraw
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    body = (230, 176, 60, 255)                      # 金色铃铛
-    d.pieslice((12, 8, 52, 48), 180, 360, fill=body)          # 铃罩上半
-    d.polygon([(12, 28), (52, 28), (56, 46), (8, 46)], fill=body)  # 铃罩下摆
-    d.rectangle((6, 46, 58, 50), fill=body)                   # 底沿
-    d.ellipse((26, 50, 38, 62), fill=body)                    # 铃锤
-    dot = (80, 200, 90, 255) if online else (220, 70, 70, 255)
-    d.ellipse((42, 42, 62, 62), fill=dot, outline=(255, 255, 255, 255), width=2)
-    return img
+    """托盘（Windows）图标：橙铃铛 + 右下状态点（绿=在线 红=离线）。"""
+    return _icon_art().tray_icon(online)
+
+
+def make_menubar_image(online):
+    """macOS 菜单栏模板图：在线=实心铃铛，离线=空心铃铛（模板图没有颜色可用）。"""
+    return _icon_art().menubar_icon(online)
+
+
+def _mac_apply_tray(icon, online):
+    """在**主线程**上把菜单栏图标和提示文字设进 NSStatusItem。
+
+    这是「菜单栏有个能点的空白位、但看不到图标」的根治：pystray 的
+    _base._start_setup() 会起一个后台线程去执行 `visible = True` →
+    _show() → setImage_()，而 AppKit 不允许在非主线程改 UI —— 状态项是主线程
+    建的所以能点能弹菜单，图标却永远不会被画出来。
+    顺带把图设成模板图并按 22pt 尺寸标注：2× 位图 + setSize_ 才能在视网膜屏上清晰，
+    模板图则让系统按菜单栏明暗自动上色（浅色栏黑、深色栏白），永远看得见。
+    """
+    try:
+        import io as _io
+        import AppKit
+        import Foundation
+        from PyObjCTools import AppHelper
+    except Exception as e:
+        log("菜单栏：pyobjc 不可用（%r）" % e)
+        return
+    buf = _io.BytesIO()
+    make_menubar_image(online).save(buf, "png")
+    png = buf.getvalue()
+    title = "%s — %s" % (APP_NAME, "在线" if online else "离线")
+
+    def apply():
+        try:
+            item = getattr(icon, "_status_item", None)
+            if item is None:
+                return
+            img = AppKit.NSImage.alloc().initWithData_(Foundation.NSData(png))
+            img.setSize_(AppKit.NSMakeSize(22, 22))
+            img.setTemplate_(True)
+            btn = item.button()
+            btn.setImage_(img)
+            btn.setToolTip_(title)
+            btn.setHidden_(False)
+        except Exception as e:
+            log("菜单栏：设置图标失败（%r）" % e)
+    AppHelper.callAfter(apply)
 
 
 # ============================================================================
@@ -489,12 +537,16 @@ def main():
 
     def on_state_change(online):
         icon = tray.get("icon")
-        if icon:
-            try:
+        if not icon:
+            return
+        try:
+            if IS_MAC:
+                _mac_apply_tray(icon, online)      # 必须在主线程改，见函数注释
+            else:
                 icon.icon = make_icon_image(online)
                 icon.title = "%s — %s" % (APP_NAME, "在线" if online else "离线")
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     dm = DeviceManager(cfg, on_state_change)
     watcher = NotificationWatcher(
@@ -598,7 +650,8 @@ def main():
 
             def make():
                 try:
-                    icon.run_detached()
+                    # setup 传空函数：默认 setup 会在后台线程里 setImage_，那样图标画不出来
+                    icon.run_detached(setup=lambda _i: None)
                 except Exception as e:
                     # 挂不上：恢复 Dock 图标 + 亮出窗口，否则用户没有任何入口
                     log("菜单栏：图标创建失败（%r），改用 Dock + 窗口兜底" % e)
@@ -609,6 +662,7 @@ def main():
                         pass
                     return
                 tray_ok["flag"] = True
+                _mac_apply_tray(icon, bool(dm.host))   # 主线程画图标（关键）
                 _mac_accessory(True)       # 图标就位，从 Dock 撤下
                 log("菜单栏：图标已挂载（不在 Dock 中，点图标出菜单）")
             AppHelper.callAfter(make)
