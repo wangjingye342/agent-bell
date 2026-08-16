@@ -55,6 +55,12 @@ jobs:
           python-version: "3.12"
       - name: 构建 .app + DMG
         run: bash pack/build_mac.sh applesilicon
+      - name: 校验只驻留菜单栏（LSUIElement 必须为 true）
+        run: |
+          PLIST="pack/dist-mac/AgentBell Bridge.app/Contents/Info.plist"
+          plutil -p "$PLIST"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$PLIST")" = "true"
+          echo "OK：应用不会出现在 Dock 中"
       - uses: actions/upload-artifact@v4
         with:
           name: AgentBellBridge-mac-applesilicon

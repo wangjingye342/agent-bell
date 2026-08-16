@@ -55,9 +55,13 @@ app = BUNDLE(
     icon=os.path.join(HERE, "agentbell.icns"),
     bundle_identifier="com.agentbell.bridge",
     info_plist={
+        # 只驻留菜单栏：不进 Dock、不占用「强制退出」列表、没有程序菜单。
+        # 注意 pywebview 导入 cocoa 后端时会把活动策略改成 Regular，
+        # bridge.py 启动时会显式设回 Accessory（两处缺一不可，见 _mac_accessory）。
+        "LSUIElement": True,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
-        "CFBundleShortVersionString": "2.0.0",
+        "CFBundleShortVersionString": "2.0.1",
         "NSHumanReadableCopyright": "AgentBell",
     },
 )

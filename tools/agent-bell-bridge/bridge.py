@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-bridge.py — AgentBell 桥接程序（Windows 托盘常驻）。
+bridge.py — AgentBell 桥接程序（Windows 托盘 / macOS 菜单栏常驻）。
 
 装上它以后，Claude / Codex 等桌面应用不用配任何 hook：
-只要它们发出 Windows 系统通知，本程序就自动转发给局域网里的 AgentBell 设备
+只要它们发出系统通知，本程序就自动转发给局域网里的 AgentBell 设备
 （蜂鸣 + 震动 + OLED 屏显）。
 
 功能：
-  · 监听 Windows 通知中心（WinRT UserNotificationListener，轮询式）
+  · 监听系统通知中心（Windows：WinRT UserNotificationListener；macOS：通知库轮询）
   · 按应用名关键词过滤（默认 claude / codex，可在设置里改）
   · 自动发现设备：缓存 IP → mDNS → 全网段扫描；掉线自动重搜
-  · 托盘图标显示在线状态；设置面板（pywebview + ui/index.html，TE 铝面板风格）
-    可调转发规则 + 设备本体设置（音量/铃声/勿扰…）
-  · 可选开机自启（写 HKCU Run 注册表）
+  · 常驻托盘（Windows）/ 菜单栏（macOS，不进 Dock）；点图标打开设置面板
+    （pywebview + ui/index.html，TE 铝面板风格）可调转发规则 + 设备本体设置
+  · 可选开机自启（Windows 写 HKCU Run；macOS 写 LaunchAgent）
 
 架构：主线程跑 webview 事件循环；pystray / 设备守护 / 通知监听各自线程。
 UI 是本地 HTML（ui/index.html），JS 经 pywebview js_api 调下面的 Api 类。
@@ -28,7 +28,7 @@ import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bridge_config import Config, LOG_PATH, APP_DIR   # noqa: E402
+from bridge_config import Config, CONFIG_PATH, LOG_PATH, APP_DIR   # noqa: E402
 import device_api                                      # noqa: E402
 import discovery                                       # noqa: E402
 
@@ -369,7 +369,10 @@ class Api:
     # ---- 窗口 ----
     def minimize(self):
         if self._window:
-            self._window.minimize()
+            if IS_MAC:      # 不在 Dock 的应用没有可最小化的去处，直接收进菜单栏
+                self._window.hide()
+            else:
+                self._window.minimize()
         return True
 
     def hide_window(self):
@@ -402,6 +405,26 @@ def _round_corners(window):
         pass
 
 
+def _mac_accessory(on=True):
+    """macOS 活动策略：Accessory=只驻留菜单栏、Dock 里没有图标；Regular=普通应用。
+
+    .app 里的 LSUIElement 只管启动那一刻，pywebview 的 cocoa 后端**在导入时**会把策略
+    改成 Regular（Dock 图标就冒出来了），所以运行时必须显式设回 Accessory。
+    菜单栏图标万一挂不上，再调 _mac_accessory(False) 把 Dock 图标放出来兜底——
+    否则窗口一藏，用户就没有任何入口了。
+    """
+    if not IS_MAC:
+        return False
+    try:
+        import AppKit
+        # NSApplicationActivationPolicyRegular=0，Accessory=1
+        AppKit.NSApplication.sharedApplication().setActivationPolicy_(1 if on else 0)
+        return True
+    except Exception as e:
+        log("菜单栏：设置活动策略失败（%r）" % e)
+        return False
+
+
 # ============================================================================
 #  main：webview 主循环（主线程）+ pystray（自带线程）+ 两个工作线程
 # ============================================================================
@@ -411,9 +434,18 @@ def main():
         print("AgentBell Bridge 已在运行（托盘里）")
         return
     log("===== %s 启动 =====" % APP_NAME)
+    first_run = not os.path.exists(CONFIG_PATH)     # 首次运行：把面板亮出来
     cfg = Config()
 
     import webview
+    if IS_MAC:
+        # 先把 cocoa 后端导进来（它会把活动策略设成 Regular），紧接着改回 Accessory，
+        # 免得启动时 Dock 图标闪一下。之后 pywebview 拿的是 sys.modules 里的同一份。
+        try:
+            import webview.platforms.cocoa            # noqa: F401
+            _mac_accessory(True)
+        except Exception as e:
+            log("菜单栏：cocoa 后端预热失败（%r），Dock 图标可能短暂出现" % e)
 
     tray = {"icon": None}              # 先占位，回调里引用
 
@@ -432,7 +464,9 @@ def main():
         on_device_lost=dm.notify_lost)
 
     api = Api(cfg, dm, watcher)
-    show_now = "--show" in sys.argv or IS_MAC  # mac：菜单栏图标不保证可用，启动即显示窗口
+    # 常驻后台：默认不显示窗口，靠托盘/菜单栏图标进入。首次运行例外——
+    # 装完启动如果什么都不弹，用户会以为没装上（mac 上连 Dock 图标都没有）。
+    show_now = "--show" in sys.argv or first_run
     window = webview.create_window(
         APP_NAME, _ui_path(), js_api=api,
         width=WIN_W, height=WIN_H, resizable=False,
@@ -501,31 +535,52 @@ def main():
         pystray.Menu.SEPARATOR,
         MI("退出", lambda *_: do_quit()),
     )
+    icon_kwargs = {}
+    if IS_MAC:
+        # pystray 文档：darwin 后端要拿到宿主的 NSApplication 才能跟它的主循环共存。
+        # 这是**构造参数**（不是 run_detached 的参数）；这里和 pywebview 拿的是同一个共享实例。
+        try:
+            import AppKit
+            icon_kwargs["darwin_nsapplication"] = AppKit.NSApplication.sharedApplication()
+        except Exception:
+            pass
     icon = pystray.Icon("agentbell-bridge", make_icon_image(False),
-                        "%s — 启动中" % APP_NAME, menu)
+                        "%s — 启动中" % APP_NAME, menu, **icon_kwargs)
     tray["icon"] = icon
 
     def _setup_tray_mac():
-        """macOS：菜单栏图标必须挂在 pywebview 的 NSApplication 上、且在主线程建。
-        失败只降级（窗口关闭即退出），不影响转发主功能。"""
+        """macOS：只驻留菜单栏，不进 Dock。
+
+        菜单栏图标（NSStatusItem）必须在主线程、且挂在 pywebview 已建好的
+        NSApplication 上，所以这里 callAfter 到主线程再建。darwin 后端点图标弹菜单
+        （HAS_DEFAULT_ACTION=False），菜单第一项就是「打开设置」。
+        """
         try:
-            import AppKit
             from PyObjCTools import AppHelper
-            nsapp = AppKit.NSApplication.sharedApplication()
 
             def make():
                 try:
-                    try:
-                        icon.run_detached(darwin_nsapplication=nsapp)
-                    except TypeError:          # 老版 pystray 没有这个参数
-                        icon.run_detached()
-                    tray_ok["flag"] = True
-                    log("托盘：菜单栏图标已挂载")
+                    icon.run_detached()
                 except Exception as e:
-                    log("托盘：菜单栏图标创建失败（%r），关窗即退出" % e)
+                    # 挂不上：恢复 Dock 图标 + 亮出窗口，否则用户没有任何入口
+                    log("菜单栏：图标创建失败（%r），改用 Dock + 窗口兜底" % e)
+                    _mac_accessory(False)
+                    try:
+                        window.show()
+                    except Exception:
+                        pass
+                    return
+                tray_ok["flag"] = True
+                _mac_accessory(True)       # 图标就位，从 Dock 撤下
+                log("菜单栏：图标已挂载（不在 Dock 中，点图标出菜单）")
             AppHelper.callAfter(make)
         except Exception as e:
-            log("托盘：pyobjc 不可用（%r），关窗即退出" % e)
+            log("菜单栏：pyobjc 不可用（%r），改用 Dock + 窗口兜底" % e)
+            _mac_accessory(False)
+            try:
+                window.show()
+            except Exception:
+                pass
 
     dm.start()
     watcher.start()
