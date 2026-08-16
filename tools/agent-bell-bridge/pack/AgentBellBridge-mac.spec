@@ -27,6 +27,7 @@ a = Analysis(
         "webview.platforms.cocoa",                     # pywebview macOS 后端
         "pystray._darwin",                             # 菜单栏图标后端
         "PIL.ImageDraw",
+        "diag",                                        # --diag 自检（运行时才 import）
     ],
     excludes=["tkinter", "winrt", "matplotlib", "numpy", "scipy", "pandas"],
     noarchive=False,
@@ -62,7 +63,7 @@ app = BUNDLE(
         "LSUIElement": True,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "12.0",
-        "CFBundleShortVersionString": "2.2.1",
+        "CFBundleShortVersionString": "2.2.2",
         "NSHumanReadableCopyright": "AgentBell",
     },
 )

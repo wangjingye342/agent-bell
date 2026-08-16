@@ -515,6 +515,13 @@ def _mac_accessory(on=True):
 #  main：webview 主循环（主线程）+ pystray（自带线程）+ 两个工作线程
 # ============================================================================
 def main():
+    if "--diag" in sys.argv:
+        # 通知监听自检：不开界面/托盘，也不抢单实例锁（程序在跑时也能诊断）。
+        # 必须由 App 自己的二进制跑 —— macOS 的「完全磁盘访问权限」按可执行文件授予，
+        # 用 Terminal 里的 python 测出来的是 Terminal 的权限，结论会误导。
+        import diag
+        diag.run(Config(), IS_MAC)
+        return
     lock = acquire_singleton()
     if lock is None:
         print("AgentBell Bridge 已在运行（托盘里）")

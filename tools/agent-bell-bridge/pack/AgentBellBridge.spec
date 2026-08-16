@@ -40,6 +40,7 @@ a = Analysis(
         "clr_loader",
         # —— PIL 图标绘制 ——
         "PIL.ImageDraw", "PIL.ImageTk",
+        "diag",                                        # --diag 自检（运行时才 import）
     ],
     excludes=["matplotlib", "numpy", "scipy", "pandas", "tkinter"],
     noarchive=False,

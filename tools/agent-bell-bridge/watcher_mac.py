@@ -29,15 +29,65 @@ import time
 from watcher import send_notify          # 转发是纯 stdlib，直接复用 Windows 版的
 
 
-def _db_path():
-    """通知中心数据库路径；拿不到（非 macOS / 系统改了布局）返回 None。"""
+def db_candidates():
+    """通知库的候选路径，新系统在前。
+
+    macOS 12 (Monterey) 起 usernoted 把库搬进了 Group Containers；
+    `$(getconf DARWIN_USER_DIR)com.apple.notificationcenter/db2/db` 是 11 及更早的
+    位置，在新系统上**根本不存在** —— 只认老路径会一直判成「没权限」，
+    而真实症状是：测试通知能响（那条不经过通知库），真通知永远不转发。
+    """
+    out = [os.path.join(os.path.expanduser("~"), "Library", "Group Containers",
+                        "group.com.apple.usernoted", "db2", "db")]
     try:
         base = subprocess.check_output(
             ["getconf", "DARWIN_USER_DIR"], text=True, timeout=5).strip()
+        out.append(os.path.join(base, "com.apple.notificationcenter", "db2", "db"))
     except Exception:
-        return None
-    p = os.path.join(base, "com.apple.notificationcenter", "db2", "db")
-    return p if os.path.exists(p) else None
+        pass
+    return out
+
+
+def _db_path():
+    """第一个存在的候选路径；都不存在返回 None。"""
+    for p in db_candidates():
+        try:
+            if os.path.exists(p):
+                return p
+        except Exception:
+            continue
+    return None
+
+
+def _connect_ro(db_path):
+    """只读打开通知库，返回 (connection, cleanup)。
+
+    直接 mode=ro 打开最省事，但这个库是 WAL 模式：只读连接需要能用 -shm 共享内存，
+    权限/沙箱不允许时会抛错，或者退化成看不到 -wal 里最新的几条 —— 那正是
+    「状态一直绿着、却永远收不到新通知」的静默失效。所以失败就把
+    db/-wal/-shm 三个文件快照到临时目录再正常打开，保证读到最新数据。
+    """
+    try:
+        con = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True, timeout=1.0)
+        con.execute("SELECT 1 FROM record LIMIT 1")        # 真读一下才知道能不能读
+        return con, (lambda: None)
+    except sqlite3.OperationalError:
+        import shutil
+        import tempfile
+        tmp = tempfile.mkdtemp(prefix="agentbell-nc-")
+        dst = os.path.join(tmp, "db")
+        for suffix in ("", "-wal", "-shm"):
+            src = db_path + suffix
+            if os.path.exists(src):
+                shutil.copy2(src, dst + suffix)            # 带上 WAL，才有最新几条
+        con = sqlite3.connect(dst, timeout=2.0)
+
+        def cleanup():
+            try:
+                con.close()
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+        return con, cleanup
 
 
 def _parse_record(blob):
@@ -66,7 +116,7 @@ def _fetch_current(db_path, limit=200):
     没有该列时用 rec_id + 内容哈希。只读打开（uri mode=ro），不碰 WAL 写锁；
     权限不够时 sqlite 抛 OperationalError，由调用方按 no_access 处理。
     """
-    con = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True, timeout=1.0)
+    con, cleanup = _connect_ro(db_path)
     try:
         cols = _record_cols(con)
         datecol = next((c for c in ("delivered_date", "presented_date", "date")
@@ -79,7 +129,7 @@ def _fetch_current(db_path, limit=200):
             "SELECT %s FROM record r ORDER BY r.rec_id DESC LIMIT ?" % sel,
             (limit,)).fetchall()
     finally:
-        con.close()
+        cleanup()
     out = []
     for row in rows:
         rec_id, blob, ident = row[0], row[1], row[2]
@@ -118,6 +168,7 @@ class NotificationWatcher(threading.Thread):
         self._last_sent = 0.0       # 冷却计时（monotonic）
         self._pending = None        # 冷却中/发送失败的通知，暂存待发
         self._pending_tries = 0
+        self._title_match_noted = False
 
     def run(self):
         announced = False
@@ -138,7 +189,8 @@ class NotificationWatcher(threading.Thread):
                     self.status = "ok"
                     if not announced:
                         announced = True
-                        self.log("监听：通知库可读，开始轮询（存量 %d 条）" % len(rows))
+                        self.log("监听：通知库可读，开始轮询（存量 %d 条）；库路径 %s"
+                                 % (len(rows), path))
                     else:
                         self.log("监听：权限恢复，继续轮询")
                 self._flush_pending(time.monotonic())   # 先补发上轮欠着的
@@ -174,6 +226,16 @@ class NotificationWatcher(threading.Thread):
             bundle = bundle or ident
             b = (bundle or "").lower()
             hit = next((k for k in keywords if k in b), None)
+            if not hit:
+                # bundle id 不中时再看标题/副标题：命令行版 Claude Code 用
+                # osascript 发通知，bundle 是「脚本编辑器」或终端的，只看 bundle
+                # 会漏掉。只看标题不看正文，避免正文里提一句 claude 就误触。
+                t = ("%s %s" % (titl, subt)).lower()
+                hit = next((k for k in keywords if k in t), None)
+                if hit and not self._title_match_noted:
+                    self._title_match_noted = True
+                    self.log("监听：按标题匹配到「%s」（发通知的应用是 %s，"
+                             "不是它自己的 bundle）" % (hit, bundle or "?"))
             if not hit:
                 continue
             agent = hit.capitalize()                 # claude → Claude（bundle id 没有显示名）
